@@ -11,7 +11,8 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
-    "solc": "^0.8.17",
+    "@openzeppelin/contracts": "^5.2.0",
+    "solc": "^0.8.20",
     "web3": "^4.16.0"
   },
   "devDependencies": {
