@@ -7,7 +7,7 @@ const rpcUrl = "http://127.0.0.1:7545"; // Ganache local RPC URL
 const web3 = new Web3(rpcUrl);
 
 const PRIVATE_KEY =
-  "0x507ca04a9d724ed5a25a803818ca8b431d2f4acc1b67b973827a832fa8026d67";
+  "0x60a1b09c0662f4efa5bcb62568f9cecb6e98dd46cc5649c716258e574a6c052f";
 const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY);
 web3.eth.accounts.wallet.add(account);
 
@@ -15,7 +15,7 @@ web3.eth.accounts.wallet.add(account);
 const abi = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "ERC20TokenABI.json"), "utf8")
 );
-const deployedAddress = "0xe77db9d56143f1094c7d1e9bc52eaa621c1518cc";
+const deployedAddress = "0xb196ee2c6f5d36b942d45de073ebecb93878608e";
 
 // Create contract instance
 const contract = new web3.eth.Contract(abi, deployedAddress);

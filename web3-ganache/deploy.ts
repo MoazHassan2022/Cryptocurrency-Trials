@@ -5,31 +5,6 @@ import path from "path";
 const rpcUrl = "http://127.0.0.1:7545"; // Ganache
 const web3 = new Web3(rpcUrl);
 
-async function signTransaction(txData: Transaction): Promise<string> {
-  const PRIVATE_KEY =
-    "0x507ca04a9d724ed5a25a803818ca8b431d2f4acc1b67b973827a832fa8026d67";
-  const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY);
-
-  const nonce = await web3.eth.getTransactionCount(account.address, "pending");
-
-  txData.from = account.address;
-
-  const signedTx = await web3.eth.accounts.signTransaction(
-    {
-      ...txData,
-      from: account.address,
-      nonce,
-    },
-    PRIVATE_KEY
-  );
-
-  if (!signedTx.rawTransaction) {
-    throw new Error("Failed to sign transaction");
-  }
-
-  return signedTx.rawTransaction;
-}
-
 async function deployContract() {
   const abi = JSON.parse(
     fs.readFileSync(path.resolve(__dirname, "ERC20TokenABI.json"), "utf8")
@@ -38,29 +13,32 @@ async function deployContract() {
     .readFileSync(path.resolve(__dirname, "ERC20TokenBytecode.txt"), "utf8")
     .trim();
 
+  const PRIVATE_KEY =
+    "0x60a1b09c0662f4efa5bcb62568f9cecb6e98dd46cc5649c716258e574a6c052f";
+  const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY);
+  web3.eth.accounts.wallet.add(account);
+
   const contract = new web3.eth.Contract(abi);
+
   const deployTx = contract.deploy({
     data: "0x" + bytecode,
-    arguments: ["Moaz Token", "MZT"],
+    arguments: ["Moaz Token 2", "MZT2"],
   });
 
-  const gas = await deployTx.estimateGas();
+  const gas = Number(await deployTx.estimateGas());
+  const gasPrice = Number(await web3.eth.getGasPrice());
 
-  const encodedABI = deployTx.encodeABI();
+  console.log("gas limit", gas);
+  console.log("gas", gas);
+  console.log("gasPrice", gasPrice);
 
-  const gasPrice = await web3.eth.getGasPrice();
+  const deployedContract = await deployTx.send({
+    from: account.address,
+    gas: gas.toString(),
+    gasPrice: gasPrice.toString(),
+  });
 
-  const txData: Transaction = {
-    data: encodedABI,
-    gas,
-    gasPrice,
-  };
-
-  const signedTx = await signTransaction(txData);
-
-  const receipt = await web3.eth.sendSignedTransaction(signedTx);
-
-  console.log("✅ Contract deployed at:", receipt.contractAddress);
+  console.log("✅ Contract deployed at:", deployedContract.options.address);
 }
 
 deployContract().catch(console.error);

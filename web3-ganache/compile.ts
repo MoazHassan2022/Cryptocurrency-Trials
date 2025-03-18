@@ -3,9 +3,6 @@ import solc from "solc";
 import * as fs from "fs";
 import * as path from "path";
 
-const contractPath = path.resolve(__dirname, "contracts", "erc20-token.sol");
-const source = fs.readFileSync(contractPath, "utf8");
-
 function findImports(importPath: string) {
   try {
     const fullPath = path.resolve("node_modules", importPath);
@@ -15,6 +12,17 @@ function findImports(importPath: string) {
     return { error: `Import not found: ${importPath}` };
   }
 }
+
+const source = `
+    // SPDX-License-Identifier: MIT
+    pragma solidity ^0.8.20;
+
+    import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+    contract ERC20Token is ERC20 {
+        constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+    }
+`;
 
 const input = {
   language: "Solidity",
