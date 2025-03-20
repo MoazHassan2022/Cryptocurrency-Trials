@@ -13,16 +13,8 @@ function findImports(importPath: string) {
   }
 }
 
-const source = `
-    // SPDX-License-Identifier: MIT
-    pragma solidity ^0.8.20;
-
-    import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-    contract ERC20Token is ERC20 {
-        constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
-    }
-`;
+const contractPath = path.resolve(__dirname, "contracts", "erc20-token.sol");
+const source = fs.readFileSync(contractPath, "utf8");
 
 const input = {
   language: "Solidity",
