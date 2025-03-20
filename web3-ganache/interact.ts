@@ -7,7 +7,7 @@ const rpcUrl = "http://127.0.0.1:7545"; // Ganache local RPC URL
 const web3 = new Web3(rpcUrl);
 
 const PRIVATE_KEY =
-  "0x60a1b09c0662f4efa5bcb62568f9cecb6e98dd46cc5649c716258e574a6c052f";
+  "";
 const account = web3.eth.accounts.privateKeyToAccount(PRIVATE_KEY);
 web3.eth.accounts.wallet.add(account);
 
