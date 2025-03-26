@@ -12,7 +12,13 @@
   "description": "",
   "dependencies": {
     "@openzeppelin/contracts": "^5.2.0",
+    "@poanet/solidity-flattener": "^3.0.9",
+    "dotenv": "^16.4.7",
+    "glob": "^11.0.1",
+    "sol-flattener": "^1.0.1",
     "solc": "^0.8.20",
+    "solpp": "^0.11.5",
+    "truffle-flattener": "^1.6.0",
     "web3": "^4.16.0"
   },
   "devDependencies": {

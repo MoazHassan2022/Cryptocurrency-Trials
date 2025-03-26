@@ -1,9 +1,9 @@
-import Web3, { ContractAbi, Transaction } from "web3";
+import Web3, { ContractAbi } from "web3";
 import fs from "fs";
 import path from "path";
 import { DeployerMethodClass } from "web3-eth-contract";
 
-const rpcUrl = "http://localhost:7545" // "https://ethereum-sepolia-rpc.publicnode.com"; // Ganache
+const rpcUrl = /*"http://localhost:7545"*/ "https://ethereum-sepolia-rpc.publicnode.com"; // Ganache
 const web3 = new Web3(rpcUrl);
 const PRIVATE_KEY =
     "";
@@ -46,7 +46,7 @@ async function deployContract() {
 
   const deployTx = contract.deploy({
     data: "0x" + bytecode,
-    arguments: ["Moaz Token 10", "MZT10", account.address, account.address, initialSupply, 20],
+    arguments: ["Moaz Token 11", "MZT11", account.address, account.address, initialSupply, 20],
   });
 
   const rawTransaction = await signTransaction(deployTx);
