@@ -259,31 +259,35 @@ abstract contract ERC20Pausable is ERC20, Pausable {
         super._update(from, to, value);
     }
 }
-contract ERC20Token is ERC20, Ownable, ERC20Burnable, ERC20Pausable {
-    uint8 private _customDecimals;
-    constructor(string memory name, string memory symbol, address owner, address recipient, uint256 initialSupply, uint8 decimals_) 
-    ERC20(name, symbol) 
-    Ownable(owner)
-    {
-        _customDecimals = decimals_;
-        _mint(recipient, initialSupply);
+        contract ERC20Token is ERC20, Ownable, ERC20Burnable, ERC20Pausable{
+        uint8 private _customDecimals;
+      
+        constructor(string memory name, string memory symbol, address owner, address recipient, uint256 initialSupply, uint8 decimals_) 
+        ERC20(name, symbol) 
+        Ownable(owner)
+        {
+            _customDecimals = decimals_;
+            _mint(recipient, initialSupply);
+        }
+      
+        function decimals() public view override returns (uint8) {
+            return _customDecimals;
+        }
+      
+        function mint(address to, uint256 amount) public onlyOwner {
+            _mint(to, amount);
+        }
+    
+        function pause() public onlyOwner {
+            _pause();
+        }
+        function unpause() public onlyOwner {
+            _unpause();
+        }
+        function _update(address from, address to, uint256 value)
+            internal
+            override(ERC20, ERC20Pausable)
+        {
+            super._update(from, to, value);
+        }
     }
-    function decimals() public view override returns (uint8) {
-        return _customDecimals;
-    }
-    function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
-    }
-    function pause() public onlyOwner {
-        _pause();
-    }
-    function unpause() public onlyOwner {
-        _unpause();
-    }
-    function _update(address from, address to, uint256 value)
-        internal
-        override(ERC20, ERC20Pausable)
-    {
-        super._update(from, to, value);
-    }
-}

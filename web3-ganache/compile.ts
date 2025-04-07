@@ -1,4 +1,3 @@
-//@ts-ignore
 import solc from "solc";
 import * as fs from "fs";
 import * as path from "path";
@@ -127,7 +126,6 @@ function generateSource(config: any): string {
 
 const source = fs.readFileSync(path.resolve(__dirname, 'contracts', 'erc20-token.sol'), 'utf8');
 
-console.log('sourceee', source);
 
 const input = {
   language: 'Solidity',
@@ -149,9 +147,7 @@ const input = {
 let compiled: any;
 try {
   compiled = JSON.parse(
-    solc.compile(JSON.stringify(input),{
-      import: findImports
-    })
+    solc.compile(JSON.stringify(input))
   );
 } catch (e) {
   console.error("Failed to compile contract:", e);
