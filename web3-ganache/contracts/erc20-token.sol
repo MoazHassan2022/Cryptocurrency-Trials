@@ -261,12 +261,14 @@ abstract contract ERC20Pausable is ERC20, Pausable {
 }
         contract ERC20Token is ERC20, Ownable, ERC20Burnable, ERC20Pausable{
         uint8 private _customDecimals;
+        string public documentation;
       
-        constructor(string memory name, string memory symbol, address owner, address recipient, uint256 initialSupply, uint8 decimals_) 
+        constructor(string memory name, string memory symbol, address owner, address recipient, uint256 initialSupply, uint8 decimals_, string memory _documentation) 
         ERC20(name, symbol) 
         Ownable(owner)
         {
             _customDecimals = decimals_;
+            documentation = _documentation;
             _mint(recipient, initialSupply);
         }
       
@@ -289,5 +291,8 @@ abstract contract ERC20Pausable is ERC20, Pausable {
             override(ERC20, ERC20Pausable)
         {
             super._update(from, to, value);
+        }
+        function setDocument(string memory _document) public onlyOwner {
+            documentation = _document;
         }
     }
