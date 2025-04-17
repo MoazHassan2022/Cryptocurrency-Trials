@@ -293,6 +293,8 @@ abstract contract ERC20Pausable is ERC20, Pausable {
             super._update(from, to, value);
         }
         function setDocument(string memory _document) public onlyOwner {
+            require(bytes(_document).length > 0, "Document cannot be empty");
+            require(bytes(_document).length <= 2048, "Document is too long");
             documentation = _document;
         }
     }
