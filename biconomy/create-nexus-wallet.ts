@@ -4,7 +4,7 @@ import Web3 from 'web3';
 import * as EVM_CHAINS from 'viem/chains';
 import { Chain, http } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { createBicoPaymasterClient, createNexusClient } from '@biconomy/sdk';
+import { createBicoPaymasterClient, createSmartAccountClient } from '@biconomy/sdk';
 
 const keysPath = join(process.cwd(), 'account-secrets.json');
 const keysData = JSON.parse(fs.readFileSync(keysPath, 'utf8'));
@@ -19,9 +19,9 @@ const paymaster = createBicoPaymasterClient({
 // chain.rpcUrls.default.http = ['https://ethereum-sepolia-rpc.publicnode.com', 'https://gateway.tenderly.co/public/sepolia'];
 
 async function convertPrivateKeyToSmartAccount(privateKey: string) {
-    const account = privateKeyToAccount(privateKey as any);
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
 
-    const smartAccount = await createNexusClient({
+    const smartAccount = await createSmartAccountClient({
       signer: account,
       chain,
       transport: http(chain.rpcUrls.default.http[0], {
