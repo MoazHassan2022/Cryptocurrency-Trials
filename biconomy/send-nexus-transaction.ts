@@ -15,9 +15,6 @@ const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
 const chain = EVM_CHAINS.polygon; //JSON.parse(JSON.stringify(EVM_CHAINS.polygon)) as Chain;
 const bundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["bundler"]["mainnet"]}`;
 const paymasterUrl = `https://paymaster.biconomy.io/api/v1/${chain.id}/${keysData["paymaster"]["2"]}`;
-const web3 = new Web3(
-  new Web3.providers.HttpProvider("https://polygon-rpc.com")
-);
 const paymaster = createBicoPaymasterClient({
   paymasterUrl: paymasterUrl,
 });
@@ -32,13 +29,14 @@ async function sendWithGasTransaction() {
   const smartAccount = await createSmartAccountClient({
     signer: account,
     chain,
-    transport: http(chain.rpcUrls.default.http[0], {
-      retryCount: 5,
-      retryDelay: 2000,
-    }),
+    transport: http(),
+    // transport: http(chain.rpcUrls.default.http[0], {
+    //   retryCount: 5,
+    //   retryDelay: 2000,
+    // }),
     bundlerTransport: http(bundlerUrl),
     paymaster,
-    pollingInterval: 2000,
+    // pollingInterval: 2000,
   });
 
   const hash = await smartAccount.sendTransaction({
@@ -46,6 +44,7 @@ async function sendWithGasTransaction() {
       {
         to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
         value: BigInt(0),
+        data: '0x',
       },
     ],
   } as any);
