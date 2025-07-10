@@ -7,27 +7,20 @@ import { createBicoPaymasterClient, createNexusClient } from "@biconomy/sdk";
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
-const chain = JSON.parse(JSON.stringify(EVM_CHAINS.sepolia)) as EVM_CHAINS.Chain;
+const chain = JSON.parse(JSON.stringify(EVM_CHAINS.polygon)) as EVM_CHAINS.Chain;
 // const bundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["bundler"]["mainnet"]}`;
-const bundlerUrl = 'https://bundler.biconomy.io/api/v3/11155111/bundler_3ZHyHXLLUos2j2in3jAV2GaU';
-const paymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["paymaster"]["14"]}`;
+const bundlerUrl = 'https://bundler.biconomy.io/api/v3/137/bundler_3ZkGmwJ9ypz3Fc8QVMRPARvQ';
+const paymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["paymaster"]["2"]}`;
 const paymaster = createBicoPaymasterClient({
   paymasterUrl: paymasterUrl,
 });
 
-chain.rpcUrls.default.http = ['https://ethereum-sepolia-rpc.publicnode.com', 'https://gateway.tenderly.co/public/sepolia'];
+// chain.rpcUrls.default.http = ['https://ethereum-sepolia-rpc.publicnode.com', 'https://gateway.tenderly.co/public/sepolia'];
 
 async function sendWithGasTransaction() {
-  const privateKey = keysData["wallets"]["nexus"]["14"]["privateKey"];
+  const privateKey = keysData["wallets"]["nexus"]["2"]["privateKey"];
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
-
-  console.log('before creation', {
-    signer: account,
-    chain,
-    transport: chain.rpcUrls.default.http[0],
-    bundlerTransport: bundlerUrl,
-  });
 
   const smartAccount = await createNexusClient({
     signer: account,
@@ -48,7 +41,7 @@ async function sendWithGasTransaction() {
   const hash = await smartAccount.sendTransaction({
     calls: [
       {
-        to: "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68",
+        to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
         value: parseEther("0.00001"),
       },
     ],
