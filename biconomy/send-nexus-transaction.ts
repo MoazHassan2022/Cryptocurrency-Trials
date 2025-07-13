@@ -9,8 +9,8 @@ const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
 const chain = JSON.parse(JSON.stringify(EVM_CHAINS.sepolia)) as EVM_CHAINS.Chain;
 // const bundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["bundler"]["mainnet"]}`;
-const bundlerUrl = 'https://bundler.biconomy.io/api/v3/11155111/bundler_3ZHyHXLLUos2j2in3jAV2GaU';
-const paymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["paymaster"]["14"]}`;
+const bundlerUrl = `https://bundler.biconomy.io/api/v3/${chain.id}/${keysData["networks"]["14"]["bundler"]}`;
+const paymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["14"]["paymaster"]}`;
 const paymaster = createBicoPaymasterClient({
   paymasterUrl: paymasterUrl,
 });
@@ -49,12 +49,12 @@ async function sendWithGasTransaction() {
     calls: [
       {
         to: "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68",
-        value: parseEther("0.00001"),
+        value: parseEther("0"),
       },
     ],
-    maxFeePerGas: parseEther("100", "gwei"),
-    maxPriorityFeePerGas: 18000000000,
-    gasLimit: BigInt(1000000),
+    // maxFeePerGas: parseEther("100", "gwei"),
+    // maxPriorityFeePerGas: 18000000000,
+    // gasLimit: BigInt(1000000),
   } as any);
 
   console.log("hashhhhh", hash);
