@@ -10,10 +10,10 @@ const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
 const chain = JSON.parse(JSON.stringify(EVM_CHAINS.sepolia)) as EVM_CHAINS.Chain;
 // const bundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["bundler"]["mainnet"]}`;
 const bundlerUrl = `https://bundler.biconomy.io/api/v3/${chain.id}/${keysData["networks"]["14"]["bundler"]}`;
-const paymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["14"]["paymaster"]}`;
-const paymaster = createBicoPaymasterClient({
-  paymasterUrl: paymasterUrl,
-});
+// const paymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["14"]["paymaster"]}`;
+// const paymaster = createBicoPaymasterClient({
+//   paymasterUrl: paymasterUrl,
+// });
 
 chain.rpcUrls.default.http = ['https://ethereum-sepolia-rpc.publicnode.com', 'https://gateway.tenderly.co/public/sepolia'];
 

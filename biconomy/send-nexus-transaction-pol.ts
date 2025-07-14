@@ -30,7 +30,7 @@ async function sendWithGasTransaction() {
       retryDelay: 2000,
     }),
     bundlerTransport: http(bundlerUrl),
-    paymaster,
+    // paymaster,
     pollingInterval: 2000,
   });
 
@@ -41,7 +41,7 @@ async function sendWithGasTransaction() {
     calls: [
       {
         to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-        value: parseEther("0"),
+        value: parseEther("0.004"),
       },
     ],
   } as any);
