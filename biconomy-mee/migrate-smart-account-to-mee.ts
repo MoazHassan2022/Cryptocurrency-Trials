@@ -10,8 +10,16 @@ import {
   parseEther,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { createSmartAccountClient as createV2Client } from "@biconomy/account";
-import { createBicoBundlerClient, createMeeClient, toMultichainNexusAccount, toNexusAccount } from "@biconomy/abstractjs";
+import {
+  BiconomySmartAccountV2,
+  createSmartAccountClient as createV2Client,
+} from "@biconomy/account";
+import {
+  createBicoBundlerClient,
+  createMeeClient,
+  toMultichainNexusAccount,
+  toNexusAccount,
+} from "@biconomy/abstractjs";
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
@@ -25,8 +33,22 @@ const nexusImplementationAddress = "0x0000000025a29E0598c88955fd00E256691A089c";
 const nexusBootstrapAddress = "0x000000001aafD7ED3B8baf9f46cD592690A5BBE5";
 const biconomyApiKey = keysData["biconomy-api-key"];
 
+async function deployV2Account(v2Account: BiconomySmartAccountV2) {
+  const deploymentResponse = await v2Account.sendTransaction([
+    {
+      to: await v2Account.getAccountAddress(),
+      value: "0",
+    },
+  ]);
+
+  console.log("V2 account deployment response:", deploymentResponse);
+
+  const { transactionHash } = await deploymentResponse.waitForTxHash();
+  console.log("V2 account deployment transaction hash:", transactionHash);
+}
+
 async function migrateSmartAccountToNexus() {
-  const privateKey = keysData["wallets"]["smartAccountV2"]["14"]["privateKey"];
+  const privateKey = keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"];
 
   const eoaAccount = privateKeyToAccount(privateKey as `0x${string}`);
 
@@ -53,17 +75,7 @@ async function migrateSmartAccountToNexus() {
   if (!isDeployed) {
     console.log("Account not deployed, deploying now...");
 
-    const deploymentResponse = await v2Account.sendTransaction([
-      {
-        to: v2AccountAddress,
-        value: "0",
-      },
-    ]);
-
-    console.log("V2 account deployment response:", deploymentResponse);
-
-    const { transactionHash } = await deploymentResponse.waitForTxHash();
-    console.log("V2 account deployment transaction hash:", transactionHash);
+    await deployV2Account(v2Account);
   } else {
     console.log("Account already deployed, proceeding with migration");
   }
@@ -167,7 +179,7 @@ async function getNexusClient(privateKey: `0x${string}`) {
 
   console.log("V2 entry point", v2Account.getEntryPointAddress());
 
-  console.log('Is account deployed', await v2Account.isAccountDeployed());
+  console.log("Is account deployed", await v2Account.isAccountDeployed());
 
   const v2AccountAddress = await v2Account.getAccountAddress();
   console.log("V2 Account Address:", v2AccountAddress);
@@ -188,41 +200,40 @@ async function getNexusClient(privateKey: `0x${string}`) {
 }
 
 async function testNexusMigration() {
-  const validNexusAccount = await getNexusClient(
-    keysData["wallets"]["smartAccountV2"]["2"]["privateKey"]);
-
-  const invalidPrivateKey = generatePrivateKey();
-
-  const invalidNexusAccount = await getNexusClient(invalidPrivateKey);
-
-  console.log('valid nexus account', await validNexusAccount.getInstalledValidators());
+  const nexusAccount = await getNexusClient(
+    keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"]
+  );
 
   try {
-    console.log('invalid nexus account', await invalidNexusAccount.getInstalledValidators());
-
+    console.log(
+      "valid nexus account",
+      await nexusAccount.getInstalledValidators()
+    );
   } catch (error) {
     console.log(error);
     if (error instanceof ContractFunctionExecutionError) {
-      console.log('migratinggggg');
+      console.log("migratinggggg");
+
+      return;
     }
   }
-  // console.log("Testing migrated account...");
+  console.log("Testing migrated account...");
 
-  // const testHash = await nexusAccount.sendUserOperation({
-  //   calls: [
-  //     {
-  //       to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-  //       value: parseEther("0.000001"),
-  //     },
-  //   ],
-  // } as any);
+  const testHash = await nexusAccount.sendUserOperation({
+    calls: [
+      {
+        to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
+        value: parseEther("0.000001"),
+      },
+    ],
+  } as any);
 
-  // console.log("Test transaction hash:", testHash);
+  console.log("Test transaction hash:", testHash);
 
-  // const receipt = await nexusAccount.waitForUserOperationReceipt({
-  //   hash: testHash,
-  // });
-  // console.log("Test transaction successful:", receipt.success);
+  const receipt = await nexusAccount.waitForUserOperationReceipt({
+    hash: testHash,
+  });
+  console.log("Test transaction successful:", receipt.success);
 }
 
 async function testMEEAccountTransaction() {
@@ -310,18 +321,49 @@ async function testMEEAccountTransaction() {
 }
 
 async function tryFunc() {
-  console.log('chain id', chain.id);
-  console.log('symbol', chain.nativeCurrency.symbol);
-  console.log('decimals', chain.nativeCurrency.decimals);
-  console.log('rpc', chain.rpcUrls.default.http[0]);
-  console.log('block explorer', chain.blockExplorers.default.url);
+  console.log("chain id", chain.id);
+  console.log("symbol", chain.nativeCurrency.symbol);
+  console.log("decimals", chain.nativeCurrency.decimals);
+  console.log("rpc", chain.rpcUrls.default.http[0]);
+  console.log("block explorer", chain.blockExplorers.default.url);
+}
+
+async function testDeployV2Account() {
+  const privateKey = keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"];
+
+  console.log("private key", privateKey);
+
+  const eoaAccount = privateKeyToAccount(privateKey as `0x${string}`);
+
+  console.log("EOA Address:", eoaAccount.address);
+
+  const client = createWalletClient({
+    account: eoaAccount,
+    chain,
+    transport: http(chain.rpcUrls.default.http[0]),
+  });
+
+  const v2Account = await createV2Client({
+    signer: client,
+    bundlerUrl: v2BundlerUrl,
+  });
+
+  const v2AccountAddress = await v2Account.getAccountAddress();
+  console.log("V2 Account Address:", v2AccountAddress);
+
+  await deployV2Account(v2Account);
+
+  const isDeployed = await v2Account.isAccountDeployed();
+
+  console.log("isDeployed", isDeployed);
 }
 
 async function main() {
-  await migrateSmartAccountToNexus();
-  // await testNexusMigration();
+  // await migrateSmartAccountToNexus();
+  await testNexusMigration();
   // await testMEEAccountTransaction();
   // await tryFunc();
+  // await testDeployV2Account();
 }
 
 main().catch(console.error);
