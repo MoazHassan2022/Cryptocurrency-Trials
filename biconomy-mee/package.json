@@ -12,7 +12,8 @@
   "description": "",
   "dependencies": {
     "@biconomy/abstractjs": "^1.0.21",
-    "viem": "^2.31.7"
+    "viem": "^2.31.7",
+    "erc-20-abi": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

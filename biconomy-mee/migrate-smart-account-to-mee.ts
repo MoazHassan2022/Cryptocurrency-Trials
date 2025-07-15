@@ -3,13 +3,13 @@ import * as fs from "fs";
 import * as EVM_CHAINS from "viem/chains";
 import { http, parseEther } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { createMeeClient, DEFAULT_STAGING_PATHFINDER_URL, toMultichainNexusAccount } from "@biconomy/abstractjs";
+import { createMeeClient, toMultichainNexusAccount } from "@biconomy/abstractjs";
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
 const chain = JSON.parse(JSON.stringify(EVM_CHAINS.polygon)) as EVM_CHAINS.Chain;
 
-async function sendTransaction() {
+async function migrateSmartAccountToNexus() {
   const privateKey = keysData["wallets"]["nexus"]["2"]["privateKey"];
   const biconomyApiKey = keysData["biconomy-api-key"];
 
@@ -79,7 +79,7 @@ async function sendTransaction() {
 }
 
 async function main() {
-  await sendTransaction();
+  await migrateSmartAccountToNexus();
 }
 
 main().catch(console.error);

@@ -1,9 +1,10 @@
 import { join } from "path";
 import * as fs from "fs";
 import * as EVM_CHAINS from "viem/chains";
-import { http, parseEther } from "viem";
+import { encodeFunctionData, http, parseEther } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { createMeeClient, DEFAULT_STAGING_PATHFINDER_URL, toMultichainNexusAccount } from "@biconomy/abstractjs";
+import { createMeeClient, toMultichainNexusAccount } from "@biconomy/abstractjs";
+const abi = require('erc-20-abi');
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
@@ -36,11 +37,17 @@ async function sendTransaction() {
 
   console.log("Smart account address:", smartAccountAddress);
 
+  const data = encodeFunctionData({
+    abi: abi,
+    functionName: 'transfer',
+    args: ["0x372371535faDD69CA29E136Ab9e54717f787f9Cf", 100000],
+  });
+
   const quote = await meeClient.getQuote({
     instructions: [{
       calls: [{
-        to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-        value: parseEther("0.00001"),
+        to: "0x31755970c67BB8316816b8AdcB58d792ac262043",
+        data,
       }],
       chainId: chain.id,
     }],
