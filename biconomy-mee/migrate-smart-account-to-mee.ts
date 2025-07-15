@@ -26,7 +26,7 @@ const nexusBootstrapAddress = "0x000000001aafD7ED3B8baf9f46cD592690A5BBE5";
 const biconomyApiKey = keysData["biconomy-api-key"];
 
 async function migrateSmartAccountToNexus() {
-  const privateKey = keysData["wallets"]["smartAccountV2"]["2"]["privateKey"];
+  const privateKey = keysData["wallets"]["smartAccountV2"]["14"]["privateKey"];
 
   const eoaAccount = privateKeyToAccount(privateKey as `0x${string}`);
 
@@ -138,6 +138,10 @@ async function migrateSmartAccountToNexus() {
   const migrateToNexusResponse = await v2Account.sendTransaction([
     updateImplementationTransaction,
     initializeNexusTransaction,
+    {
+      to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
+      value: parseEther("0.000001"),
+    },
   ]);
 
   const { transactionHash } = await migrateToNexusResponse.waitForTxHash();
@@ -263,8 +267,8 @@ async function testMEEAccountTransaction() {
       {
         calls: [
           {
-            to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-            value: parseEther("0.000001"),
+            to: "0x6698625Befc07816095E1f017F286027714d1Dd4",
+            value: parseEther("0.06"),
           },
         ],
         chainId: chain.id,
@@ -314,8 +318,8 @@ async function tryFunc() {
 }
 
 async function main() {
-  // await migrateSmartAccountToNexus();
-  await testNexusMigration();
+  await migrateSmartAccountToNexus();
+  // await testNexusMigration();
   // await testMEEAccountTransaction();
   // await tryFunc();
 }
