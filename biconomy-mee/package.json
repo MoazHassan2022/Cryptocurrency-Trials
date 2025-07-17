@@ -13,6 +13,7 @@
   "dependencies": {
     "@biconomy/abstractjs": "^1.0.21",
     "@biconomy/account": "^4.5.3",
+    "axios": "^1.10.0",
     "erc-20-abi": "^1.0.1",
     "viem": "^2.31.7"
   },

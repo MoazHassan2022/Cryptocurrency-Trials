@@ -12,14 +12,16 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   BiconomySmartAccountV2,
+  createBundler,
   createSmartAccountClient as createV2Client,
 } from "@biconomy/account";
 import {
-  createBicoBundlerClient,
   createMeeClient,
+  createSmartAccountClient,
   toMultichainNexusAccount,
   toNexusAccount,
 } from "@biconomy/abstractjs";
+import axios from "axios";
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
@@ -191,9 +193,12 @@ async function getNexusClient(privateKey: `0x${string}`) {
     accountAddress: v2AccountAddress,
   });
 
-  const nexusAccount = createBicoBundlerClient({
+  const nexusAccount = createSmartAccountClient({
     account,
     transport: http(v3BundlerUrl),
+    // paymaster: await createBicoPaymasterClient({
+    //   transport: http(paymasterUrl),
+    // }),
   });
 
   return nexusAccount;
@@ -219,21 +224,73 @@ async function testNexusMigration() {
   }
   console.log("Testing migrated account...");
 
-  const testHash = await nexusAccount.sendUserOperation({
+  const userOperation: any = await nexusAccount.prepareUserOperation({
     calls: [
       {
         to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
         value: parseEther("0.000001"),
+        data: "0x",
       },
     ],
   } as any);
 
-  console.log("Test transaction hash:", testHash);
+  const signature = await nexusAccount.account.signUserOperation(
+    userOperation as any
+  );
 
-  const receipt = await nexusAccount.waitForUserOperationReceipt({
-    hash: testHash,
-  });
-  console.log("Test transaction successful:", receipt.success);
+  userOperation.signature = signature;
+  userOperation.initCode = "0x";
+  userOperation.paymasterAndData = "0x";
+  userOperation.verificationGasLimit = "10000000";
+  console.log("userOperationnnn", userOperation);
+
+  await sendUserOperation(userOperation);
+}
+
+async function sendUserOperation(userOperation: any) {
+  const params = [
+    {
+      sender: userOperation.sender,
+      factory: "0x", 
+      factoryData: "0x",
+      nonce: "0x763e709f60477f07885230e213b8149a7827239b0000000000000035",
+      callData: userOperation.callData,
+      signature: userOperation.signature,
+      preVerificationGas: Number(userOperation.preVerificationGas).toString(),
+      verificationGasLimit: Number(userOperation.verificationGasLimit).toString(),
+      callGasLimit: Number(userOperation.callGasLimit).toString(),
+      maxFeePerGas: Number(userOperation.maxFeePerGas).toString(),
+      maxPriorityFeePerGas: Number(userOperation.maxPriorityFeePerGas).toString(),
+      paymaster: "0x",
+      paymasterVerificationGasLimit: "0x0",
+      paymasterPostOpGasLimit: "0x0",
+      paymasterData: "0x",
+    },
+    "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    {}
+  ];
+
+  console.log('paramsss', params);
+
+  const data = {
+    jsonrpc: "2.0",
+    method: "eth_sendUserOperation",
+    id: (new Date()).getTime(),
+    params,
+    entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+  };
+
+  console.log("dataaa", JSON.stringify(data));
+  console.log("v3 bundler url", v3BundlerUrl);
+  
+  let response;
+  try {
+    response = await axios.post(v3BundlerUrl, data);
+  } catch (error) {
+    console.log('errrrorrr', error.response.data);
+  }
+
+  console.log("response", JSON.stringify(response.data));
 }
 
 async function testMEEAccountTransaction() {
