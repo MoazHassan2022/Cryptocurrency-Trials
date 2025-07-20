@@ -39,8 +39,8 @@ async function sendTransaction() {
   const quote = await meeClient.getQuote({
     instructions: [{
       calls: [{
-        to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-        value: parseEther("0.00001"),
+        to: "0x6474B3178cFA83A628c235515E8613E6eA93697e",
+        value: parseEther("0.06"),
       }],
       chainId: chain.id,
     }],

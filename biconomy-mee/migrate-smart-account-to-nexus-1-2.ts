@@ -14,6 +14,7 @@ import {
   BiconomySmartAccountV2,
   createBundler,
   createSmartAccountClient as createV2Client,
+  UserOperationStruct,
 } from "@biconomy/account";
 import {
   createMeeClient,
@@ -29,6 +30,7 @@ const chain = JSON.parse(
   JSON.stringify(EVM_CHAINS.polygon)
 ) as EVM_CHAINS.Chain;
 const v2BundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["2"]["v2Bundler"]}`;
+const v2BundlerUrlNew = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["2"]["bundler"]}`;
 const v3BundlerUrl = `https://bundler.biconomy.io/api/v3/${chain.id}/${keysData["networks"]["2"]["bundler"]}`;
 
 const nexusImplementationAddress = "0x0000000025a29E0598c88955fd00E256691A089c";
@@ -177,6 +179,7 @@ async function getNexusClient(privateKey: `0x${string}`) {
   const v2Account = await createV2Client({
     signer: client,
     bundlerUrl: v2BundlerUrl,
+    // entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
   });
 
   console.log("V2 entry point", v2Account.getEntryPointAddress());
@@ -206,8 +209,30 @@ async function getNexusClient(privateKey: `0x${string}`) {
 
 async function testNexusMigration() {
   const nexusAccount = await getNexusClient(
-    keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"]
+    keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"],
   );
+
+  // const userOp = await v2Account.buildUserOp([{
+  //   to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
+  //   value: parseEther("0.000001"),
+  // }]);
+
+  // console.log('responssseeee', userOp);
+
+  // const signedUserOp = await v2Account.signUserOp(userOp);
+
+  // console.log('signedUserOp', signedUserOp);
+
+  // const bundler = await createBundler({
+  //   chainId: chain.id,
+  //   bundlerUrl: v2BundlerUrlNew,
+  // });
+
+  // const userOpResponse = await bundler.sendUserOp(
+  //   signedUserOp as UserOperationStruct,
+  // );
+
+  // console.log('userOpResponse', userOpResponse);
 
   try {
     console.log(
@@ -235,39 +260,52 @@ async function testNexusMigration() {
   } as any);
 
   const signature = await nexusAccount.account.signUserOperation(
-    userOperation as any
+    userOperation
   );
 
   userOperation.signature = signature;
-  userOperation.initCode = "0x";
-  userOperation.paymasterAndData = "0x";
-  userOperation.verificationGasLimit = "10000000";
   console.log("userOperationnnn", userOperation);
 
-  await sendUserOperation(userOperation);
+  const bundler = await createBundler({
+    chainId: chain.id,
+    bundlerUrl: v3BundlerUrl,
+    entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+  });
+
+  const userOpResponse = await bundler.sendUserOp(
+    userOperation as UserOperationStruct,
+  );
+
+  console.log('userOpResponse', userOpResponse);
+
+  // const testHash = await nexusAccount.sendUserOperation(userOperation);
+
+  // console.log("Test transaction hash:", testHash);
+
+  // const receipt = await nexusAccount.waitForUserOperationReceipt({
+  //   hash: testHash,
+  // });
+  // console.log("Test transaction successful:", receipt.success);
+
+  // await sendUserOperation(userOperation);
 }
 
 async function sendUserOperation(userOperation: any) {
   const params = [
     {
-      sender: userOperation.sender,
-      factory: "0x", 
-      factoryData: "0x",
-      nonce: "0x763e709f60477f07885230e213b8149a7827239b0000000000000035",
+      sender: "0x225D590b2B6D26aAe9Fc8b71a8CF424C7ad3130c",
+      nonce: `0x${userOperation.nonce.toString(16)}`,
+      // initCode: '0x',
       callData: userOperation.callData,
       signature: userOperation.signature,
-      preVerificationGas: Number(userOperation.preVerificationGas).toString(),
-      verificationGasLimit: Number(userOperation.verificationGasLimit).toString(),
-      callGasLimit: Number(userOperation.callGasLimit).toString(),
-      maxFeePerGas: Number(userOperation.maxFeePerGas).toString(),
-      maxPriorityFeePerGas: Number(userOperation.maxPriorityFeePerGas).toString(),
-      paymaster: "0x",
-      paymasterVerificationGasLimit: "0x0",
-      paymasterPostOpGasLimit: "0x0",
-      paymasterData: "0x",
+      preVerificationGas: `0x${userOperation.preVerificationGas.toString(16)}`,
+      verificationGasLimit: `0x${userOperation.verificationGasLimit.toString(16)}`,
+      callGasLimit: `0x${userOperation.callGasLimit.toString(16)}`,
+      maxFeePerGas: `0x${userOperation.maxFeePerGas.toString(16)}`,
+      maxPriorityFeePerGas: `0x${userOperation.maxPriorityFeePerGas.toString(16)}`,
+      // paymasterAndData: '0x',
     },
     "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
-    {}
   ];
 
   console.log('paramsss', params);
@@ -277,7 +315,7 @@ async function sendUserOperation(userOperation: any) {
     method: "eth_sendUserOperation",
     id: (new Date()).getTime(),
     params,
-    entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+    // entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
   };
 
   console.log("dataaa", JSON.stringify(data));
