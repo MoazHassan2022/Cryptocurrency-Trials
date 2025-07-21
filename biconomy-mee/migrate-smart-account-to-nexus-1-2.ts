@@ -14,24 +14,28 @@ import {
   BiconomySmartAccountV2,
   createBundler,
   createSmartAccountClient as createV2Client,
+  PaymasterMode,
   UserOperationStruct,
 } from "@biconomy/account";
 import {
+  createBicoPaymasterClient,
   createMeeClient,
   createSmartAccountClient,
+  NexusAccount,
   toMultichainNexusAccount,
   toNexusAccount,
 } from "@biconomy/abstractjs";
 import axios from "axios";
+import { CustomSignedUserOperation, CustomUserOperation } from "types";
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
-const chain = JSON.parse(
-  JSON.stringify(EVM_CHAINS.polygon)
-) as EVM_CHAINS.Chain;
-const v2BundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["2"]["v2Bundler"]}`;
-const v2BundlerUrlNew = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["2"]["bundler"]}`;
-const v3BundlerUrl = `https://bundler.biconomy.io/api/v3/${chain.id}/${keysData["networks"]["2"]["bundler"]}`;
+const chain = JSON.parse(JSON.stringify(EVM_CHAINS.baseSepolia)) as EVM_CHAINS.Chain;
+
+const v2BundlerUrl = `https://bundler.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["19"]["v2Bundler"]}`;
+const v3BundlerUrl = `https://bundler.biconomy.io/api/v3/${chain.id}/${keysData["networks"]["19"]["bundler"]}`;
+const v1PaymasterUrl = `https://paymaster.biconomy.io/api/v1/${chain.id}/${keysData["networks"]["19"]["v1Paymaster"]}`;
+const v2PaymasterUrl = `https://paymaster.biconomy.io/api/v2/${chain.id}/${keysData["networks"]["19"]["paymaster"]}`;
 
 const nexusImplementationAddress = "0x0000000025a29E0598c88955fd00E256691A089c";
 const nexusBootstrapAddress = "0x000000001aafD7ED3B8baf9f46cD592690A5BBE5";
@@ -43,7 +47,11 @@ async function deployV2Account(v2Account: BiconomySmartAccountV2) {
       to: await v2Account.getAccountAddress(),
       value: "0",
     },
-  ]);
+  ], {
+    paymasterServiceData: {
+      mode: PaymasterMode.SPONSORED, 
+    }
+  });
 
   console.log("V2 account deployment response:", deploymentResponse);
 
@@ -67,6 +75,7 @@ async function migrateSmartAccountToNexus() {
   const v2Account = await createV2Client({
     signer: client,
     bundlerUrl: v2BundlerUrl,
+    paymasterUrl: v1PaymasterUrl,
   });
 
   const v2AccountAddress = await v2Account.getAccountAddress();
@@ -151,17 +160,35 @@ async function migrateSmartAccountToNexus() {
 
   // Send both transactions in a batch
   console.log("Sending migration transaction...");
-  const migrateToNexusResponse = await v2Account.sendTransaction([
+  const userOp = await v2Account.buildUserOp([
     updateImplementationTransaction,
     initializeNexusTransaction,
     {
       to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-      value: parseEther("0.000001"),
+      value: parseEther("0"),
     },
-  ]);
+  ], {
+    paymasterServiceData: {
+      mode: PaymasterMode.SPONSORED, 
+    }
+  });
 
-  const { transactionHash } = await migrateToNexusResponse.waitForTxHash();
-  console.log("Migration transaction hash:", transactionHash);
+  const signedUserOp = await v2Account.signUserOp(userOp);
+
+  const bundler = await createBundler({
+    chainId: chain.id,
+    bundlerUrl: v2BundlerUrl,
+  })
+
+  const userOpResponse = await bundler.sendUserOp(
+    signedUserOp as UserOperationStruct
+  );
+
+  console.log("userOpResponse", userOpResponse);
+
+  const txHashStatus = await userOpResponse.waitForTxHash();
+
+  console.log("txHashStatus", txHashStatus);
   console.log("Migration completed successfully");
 }
 
@@ -179,91 +206,83 @@ async function getNexusClient(privateKey: `0x${string}`) {
   const v2Account = await createV2Client({
     signer: client,
     bundlerUrl: v2BundlerUrl,
-    // entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
   });
 
   console.log("V2 entry point", v2Account.getEntryPointAddress());
 
-  console.log("Is account deployed", await v2Account.isAccountDeployed());
+  const isV2Deployed = await v2Account.isAccountDeployed();
+
+  console.log("Is account deployed", isV2Deployed);
+
+  let account: NexusAccount;
 
   const v2AccountAddress = await v2Account.getAccountAddress();
   console.log("V2 Account Address:", v2AccountAddress);
 
-  const account = await toNexusAccount({
-    signer: eoaAccount,
-    chain,
-    transport: http(),
-    accountAddress: v2AccountAddress,
-  });
+  if (isV2Deployed) {
+    account = await toNexusAccount({
+      signer: eoaAccount,
+      chain,
+      transport: http(),
+      accountAddress: v2AccountAddress,
+    });
+  } else {
+    account = await toNexusAccount({
+      signer: eoaAccount,
+      chain,
+      transport: http(),
+    });
+  }
 
   const nexusAccount = createSmartAccountClient({
     account,
     transport: http(v3BundlerUrl),
-    // paymaster: await createBicoPaymasterClient({
-    //   transport: http(paymasterUrl),
-    // }),
+    paymaster: createBicoPaymasterClient({
+      transport: http(v2PaymasterUrl),
+    }),
   });
+
+  if (isV2Deployed) {
+    try {
+      console.log(
+        "valid nexus account",
+        await nexusAccount.getInstalledValidators()
+      );
+    } catch (error) {
+      console.log(error);
+      if (error instanceof ContractFunctionExecutionError) {
+        console.log("migratinggggg");
+
+        return;
+      }
+    }
+  }
+
+  console.log("nexus account address", nexusAccount.account.address);
 
   return nexusAccount;
 }
 
 async function testNexusMigration() {
   const nexusAccount = await getNexusClient(
-    keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"],
+    keysData["wallets"]["smartAccountV2"]["2-2"]["privateKey"]
   );
 
-  // const userOp = await v2Account.buildUserOp([{
-  //   to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
-  //   value: parseEther("0.000001"),
-  // }]);
-
-  // console.log('responssseeee', userOp);
-
-  // const signedUserOp = await v2Account.signUserOp(userOp);
-
-  // console.log('signedUserOp', signedUserOp);
-
-  // const bundler = await createBundler({
-  //   chainId: chain.id,
-  //   bundlerUrl: v2BundlerUrlNew,
-  // });
-
-  // const userOpResponse = await bundler.sendUserOp(
-  //   signedUserOp as UserOperationStruct,
-  // );
-
-  // console.log('userOpResponse', userOpResponse);
-
-  try {
-    console.log(
-      "valid nexus account",
-      await nexusAccount.getInstalledValidators()
-    );
-  } catch (error) {
-    console.log(error);
-    if (error instanceof ContractFunctionExecutionError) {
-      console.log("migratinggggg");
-
-      return;
-    }
-  }
   console.log("Testing migrated account...");
 
-  const userOperation: any = await nexusAccount.prepareUserOperation({
+  const userOperation: CustomUserOperation = await nexusAccount.prepareUserOperation({
     calls: [
       {
-        to: "0x372371535faDD69CA29E136Ab9e54717f787f9Cf",
+        to: "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68",
         value: parseEther("0.000001"),
-        data: "0x",
+        // data: "0x",
       },
     ],
   } as any);
 
-  const signature = await nexusAccount.account.signUserOperation(
-    userOperation
-  );
+  const signature = await nexusAccount.account.signUserOperation(userOperation as CustomSignedUserOperation);
 
-  userOperation.signature = signature;
+  (userOperation as CustomSignedUserOperation).signature = signature;
   console.log("userOperationnnn", userOperation);
 
   const bundler = await createBundler({
@@ -272,22 +291,27 @@ async function testNexusMigration() {
     entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
   });
 
+  console.log("v3BundlerUrl", v3BundlerUrl);
+
+  const keys = ["paymasterPostOpGasLimit", "paymasterVerificationGasLimit"];
+
+  for (const key of keys) {
+    if (userOperation[key] && userOperation[key] !== "0x") {
+      userOperation[key] = `0x${BigInt(userOperation[key]).toString(
+        16
+      )}` as `0x${string}`;
+    }
+  }
+
   const userOpResponse = await bundler.sendUserOp(
-    userOperation as UserOperationStruct,
+    userOperation as UserOperationStruct
   );
 
-  console.log('userOpResponse', userOpResponse);
+  console.log("userOpResponse", userOpResponse);
 
-  // const testHash = await nexusAccount.sendUserOperation(userOperation);
+  const txHashStatus = await userOpResponse.waitForTxHash();
 
-  // console.log("Test transaction hash:", testHash);
-
-  // const receipt = await nexusAccount.waitForUserOperationReceipt({
-  //   hash: testHash,
-  // });
-  // console.log("Test transaction successful:", receipt.success);
-
-  // await sendUserOperation(userOperation);
+  console.log("txHashStatus", txHashStatus);
 }
 
 async function sendUserOperation(userOperation: any) {
@@ -299,33 +323,37 @@ async function sendUserOperation(userOperation: any) {
       callData: userOperation.callData,
       signature: userOperation.signature,
       preVerificationGas: `0x${userOperation.preVerificationGas.toString(16)}`,
-      verificationGasLimit: `0x${userOperation.verificationGasLimit.toString(16)}`,
+      verificationGasLimit: `0x${userOperation.verificationGasLimit.toString(
+        16
+      )}`,
       callGasLimit: `0x${userOperation.callGasLimit.toString(16)}`,
       maxFeePerGas: `0x${userOperation.maxFeePerGas.toString(16)}`,
-      maxPriorityFeePerGas: `0x${userOperation.maxPriorityFeePerGas.toString(16)}`,
+      maxPriorityFeePerGas: `0x${userOperation.maxPriorityFeePerGas.toString(
+        16
+      )}`,
       // paymasterAndData: '0x',
     },
     "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
   ];
 
-  console.log('paramsss', params);
+  console.log("paramsss", params);
 
   const data = {
     jsonrpc: "2.0",
     method: "eth_sendUserOperation",
-    id: (new Date()).getTime(),
+    id: new Date().getTime(),
     params,
     // entryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
   };
 
   console.log("dataaa", JSON.stringify(data));
   console.log("v3 bundler url", v3BundlerUrl);
-  
+
   let response;
   try {
     response = await axios.post(v3BundlerUrl, data);
   } catch (error) {
-    console.log('errrrorrr', error.response.data);
+    console.log("errrrorrr", error.response.data);
   }
 
   console.log("response", JSON.stringify(response.data));
