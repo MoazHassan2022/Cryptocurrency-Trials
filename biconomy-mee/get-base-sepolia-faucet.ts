@@ -14,7 +14,7 @@ async function main() {
     myHeaders.append("Referer", "https://portal.cdp.coinbase.com/");
     myHeaders.append(
       "Cookie",
-      "cb_dm=35ffcb84-0bd9-41d7-b5f0-03a6eef04cfb; coinbase_device_id=ec2fc50e-4e39-406e-a5ef-c6cc4a85199b; advertising_sharing_allowed={%22value%22:true}; _iidt=qz9Fl1GNHMKfVUl1V1Wwf4IQvwPJxnNydjAfy1CjslmDZdKKn7sjD2OfOx01aQ5ZkJAdvY31lzs8yTPpd8sa/Wew65LeYwQ0G77Qu80=; _cfuvid=jGx4noLF7vHDuNXDB1Ci4joxGMLy2TbOLlVMe5aUtGY-1753098052528-0.0.1.1-604800000; __cf_bm=fm3aEbIAzz6T99gLcCxw1its.seM0MKEGTZe59JgaaE-1753098270-1.0.1.1-_TZfHDd6zN.6uEXU2_Stvt66FFKsq7omehi77.94Zbv5WrB9VxcFkCaKSvFV6_tOe93Bz58rlqObSUOkhLX4i7XkKH5RZbyV.70MY.YQX1ExfpFq5Hrxb9dNU3qIZbAs; unified-oauth-state-cookie=VAY7GE4TMJLNQMA2Z62WCIEZVHB6M6XOCEN2RUPKMJFI772PTILA====; identity_device_id=2143b259-ba86-548c-9127-07e90b6e892c; oauth-locker=unified-access-7443a8e56ac4b40781ff61970309ad48d8b6ad254656e19a70c24dc3cd72c525; arkdv=09c61c75d0a6b6c6fca258d9419585e9567839260a13dfb9f805ebbc356e4504; cb-gssc=eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJhdXRoX3RpbWUiOjE3NTMwOTgyNzAsImlzcyI6Imh0dHBzOi8vbG9naW4uY29pbmJhc2UuY29tIiwic3ViIjoiOWU0ZjE0OGRjNjczOWY4MjI1ZTVlY2ZmODcxNmJhZjMiLCJleHAiOjE3NTU2OTAyNzAsImlhdCI6MTc1MzA5ODI3MH0.; unified-session-manager-cookie=MTc1MzA5ODI3MXxnTFMxY3pzOXdBc3luRGY4M0lDODNZcUd4dEI4dWhobkNzTTFpcnJ2czZ4c2xlSlloN01YdVZXRnliTXRRS0pVd2VqSmhCZDVzWXdyYWd6WkVkMndtX3NhTVlIS1NrRUd1XzlKdENydWctSVFlR2c9fG1IbzfEfAUft1KVeQgMr6VcqAcNrl-B1gFm_iv-jjs7; _cfuvid=nO0hFSjnLOzBwtAUFJSXamq9J_EL2nqvaKs0PYpeQ.E-1753092609443-0.0.1.1-604800000"
+      "cb_dm=35ffcb84-0bd9-41d7-b5f0-03a6eef04cfb; coinbase_device_id=ec2fc50e-4e39-406e-a5ef-c6cc4a85199b; advertising_sharing_allowed={%22value%22:true}; _iidt=wHUyQ3DtPZbCM0e8nnTwL1kkWeFIxb6O6TyILCZQAUJobJV6Vz/aGIP4/o0uVNxFlpMX2MkfLRaMQg==; _cfuvid=AS9Sd4ozMRNYFCPpcrdhm8_vPnCC93YJDCbFpycSX.4-1753091749156-0.0.1.1-604800000; __cf_bm=ak810L.DeqvJNnttRi7bDJHqMP7RU0KDSP.bQPbxdHU-1753091749-1.0.1.1-6yRr21iDOEZiFZJz7x18cfpz.zy1WeTjyurXSfKgiBfJHRda7ySEQJep8YRHwd4yaSZQkZGKrgyFpODOEITh4uLiNDEWBH79BITsgf7F_2w; unified-oauth-state-cookie=KSSCYPQUUIZIAMEZRZR6V67O4EEJSXZJEFWXDQGUPGDSTGCXGK5A====; identity_device_id=2143b259-ba86-548c-9127-07e90b6e892c; arkdv=09c61c75d0a6b6c6fca258d9419585e9567839260a13dfb9f805ebbc356e4504; cb-gssc=eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJhdXRoX3RpbWUiOjE3NTMwOTE2NjcsImlzcyI6Imh0dHBzOi8vbG9naW4uY29pbmJhc2UuY29tIiwic3ViIjoiYmNiMTQyOTRmMGJlNjUwZDVlYjkzODg1M2ViMmEyMWYiLCJleHAiOjE3NTU2ODM2NjcsImlhdCI6MTc1MzA5MTY2N30.; unified-session-manager-cookie=MTc1MzA5MTY2OHwyTUREX1g3UEY5ejJ1SURoMEI2YzhYOVRjU202WUwtSW9OWVhpMlVUcUNWSVlIWXBoNHFhS0F3c2FHcGl1U2hVbjVpbVJMMl9DS2tVRUtPa2t6NTQ5N2lkWmhkN1RBZ3RLVnVXNHdaa0xvVGJTRE09fOUVKaA2PFbouvo06XvErElKasaXNJSFxRF3CX9cR6fl; __cf_bm=lebWD1E8arllFl3yx2oG1zbYrA1B_DAoMMUbl.p0kkY-1753092609-1.0.1.1-HuFg0KfUDbvAXnDlCoaGG1ccjESC806xD0.XslByc3IJ.nOZ56HnUkaxwAbKFqhKYj5zkVHT571eIBrpgTD0lcjRWMYdBEPG5yyLcCs.9UQ; _cfuvid=nO0hFSjnLOzBwtAUFJSXamq9J_EL2nqvaKs0PYpeQ.E-1753092609443-0.0.1.1-604800000"
     );
     myHeaders.append("Sec-Fetch-Dest", "empty");
     myHeaders.append("Sec-Fetch-Mode", "cors");
@@ -24,7 +24,7 @@ async function main() {
 
     const raw = JSON.stringify({
       network: "base-sepolia",
-      address: "0x256FF0905edbd0211a422D42f933d853cc9FfcFf",
+      address: "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68",
       token: "eth",
     });
 
@@ -36,7 +36,7 @@ async function main() {
     };
 
     fetch(
-      "https://cloud-api.coinbase.com/platform/projects/6e70cc29-9f7d-4a91-a663-200b62ea6c07/v2/evm/faucet",
+      "https://cloud-api.coinbase.com/platform/projects/caeaa09e-d3fa-4394-a062-1942f8dedb2d/v2/evm/faucet",
       requestOptions as any
     )
       .then((response) => response.text())
