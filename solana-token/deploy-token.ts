@@ -81,7 +81,7 @@ function createMetadataInstruction(
         data: {
           name: "MozaToken",
           symbol: "MZT",
-          uri: "https://example.com/metadata.json",
+          uri: "https://custody-dev1.s3.amazonaws.com/metadata.json",
           sellerFeeBasisPoints: 0,
           creators: null,
           collection: null,
@@ -162,7 +162,7 @@ async function deployFungibleToken() {
     initMintIx,
     receiverATACreationIX,
     mintToIx,
-    createMetadataIx,
+    createMetadataIx
   );
 
   const { blockhash, lastValidBlockHeight } =
