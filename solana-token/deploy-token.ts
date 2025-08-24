@@ -56,7 +56,7 @@ async function requestAirdrop(wallet: Keypair) {
 
 function createMetadataInstruction(
   tokenMintAddress: PublicKey,
-  receiverAddress: PublicKey,
+  ownerAddress: PublicKey,
   payerAddress: PublicKey
 ) {
   const [metadataPDA] = PublicKey.findProgramAddressSync(
@@ -72,9 +72,9 @@ function createMetadataInstruction(
     {
       metadata: metadataPDA,
       mint: tokenMintAddress,
-      mintAuthority: receiverAddress,
+      mintAuthority: ownerAddress,
       payer: payerAddress,
-      updateAuthority: receiverAddress,
+      updateAuthority: ownerAddress,
     },
     {
       createMetadataAccountArgsV3: {
@@ -97,12 +97,16 @@ function createMetadataInstruction(
 async function deployFungibleToken() {
   const connection = new Connection(RPC_URL, "confirmed");
 
-  const payerKeyPayer = recreateWalletFromPrivateKey(
+  const payerKeyPair = recreateWalletFromPrivateKey(
     keysData["wallets"]["1"]["privateKey"]
   );
 
-  const receiverKeyPair = recreateWalletFromPrivateKey(
+  const recipientKeyPair = recreateWalletFromPrivateKey(
     keysData["wallets"]["2"]["privateKey"]
+  );
+
+  const ownerKeyPair = recreateWalletFromPrivateKey(
+    keysData["wallets"]["3"]["privateKey"]
   );
 
   // fungible token is considered as minting account
@@ -116,7 +120,7 @@ async function deployFungibleToken() {
 
   // Ix stands for Instruction, like Tx stands for Transaction
   const createMintIx = SystemProgram.createAccount({
-    fromPubkey: payerKeyPayer.publicKey, // to pay for account creation
+    fromPubkey: payerKeyPair.publicKey, // to pay for account creation
     newAccountPubkey: mintKeypair.publicKey, // token new address
     space: MINT_SIZE,
     lamports: requiredLamportsForMint,
@@ -126,41 +130,41 @@ async function deployFungibleToken() {
   const initMintIx = createInitializeMintInstruction(
     mintKeypair.publicKey,
     DECIMALS,
-    receiverKeyPair.publicKey,
-    receiverKeyPair.publicKey,
+    ownerKeyPair.publicKey,
+    ownerKeyPair.publicKey,
     TOKEN_PROGRAM_ID
   );
 
-  const receiverATAPublicKey = await getAssociatedTokenAddress(
+  const recipientATAPublicKey = await getAssociatedTokenAddress(
     mintKeypair.publicKey, // mint
-    receiverKeyPair.publicKey, // owner
+    recipientKeyPair.publicKey, // owner of ATA
     false
   );
 
-  const receiverATACreationIX = createAssociatedTokenAccountInstruction(
-    payerKeyPayer.publicKey, // payer
-    receiverATAPublicKey, // receiver associated token account
-    receiverKeyPair.publicKey, // receiver public key (owner of the token account)
+  const recipientATACreationIX = createAssociatedTokenAccountInstruction(
+    payerKeyPair.publicKey, // payer
+    recipientATAPublicKey, // recipient associated token account
+    recipientKeyPair.publicKey, // recipient public key (owner of the token account)
     mintKeypair.publicKey // token mint address
   );
 
   const mintToIx = createMintToInstruction(
     mintKeypair.publicKey,
-    receiverATAPublicKey,
-    receiverKeyPair.publicKey,
+    recipientATAPublicKey,
+    ownerKeyPair.publicKey,
     INITIAL_SUPPLY
   );
 
   const createMetadataIx = createMetadataInstruction(
     mintKeypair.publicKey,
-    receiverKeyPair.publicKey,
-    payerKeyPayer.publicKey
+    ownerKeyPair.publicKey,
+    payerKeyPair.publicKey
   );
 
   const transaction = new Transaction().add(
     createMintIx,
     initMintIx,
-    receiverATACreationIX,
+    recipientATACreationIX,
     mintToIx,
     createMetadataIx
   );
@@ -170,9 +174,9 @@ async function deployFungibleToken() {
 
   transaction.recentBlockhash = blockhash;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
-  transaction.feePayer = payerKeyPayer.publicKey;
+  transaction.feePayer = payerKeyPair.publicKey;
 
-  transaction.sign(payerKeyPayer, mintKeypair, receiverKeyPair);
+  transaction.sign(payerKeyPair, mintKeypair, ownerKeyPair);
 
   const rawTx = transaction.serialize();
 
@@ -185,7 +189,7 @@ async function sendTokenAmount(
   tokenMintAddress: PublicKey,
   payer: Keypair,
   sender: Keypair,
-  receiverAddress: PublicKey,
+  recipientAddress: PublicKey,
   amount: number
 ) {
   const connection = new Connection(RPC_URL, "confirmed");
@@ -196,14 +200,14 @@ async function sendTokenAmount(
     false
   );
 
-  const receiverATAPublicKey = await getAssociatedTokenAddress(
+  const recipientATAPublicKey = await getAssociatedTokenAddress(
     tokenMintAddress, // mint
-    receiverAddress, // owner
+    recipientAddress, // owner
     false
   );
 
   const destinationAccountInfo = await connection.getAccountInfo(
-    receiverATAPublicKey
+    recipientATAPublicKey
   );
   const transaction = new Transaction();
 
@@ -211,8 +215,8 @@ async function sendTokenAmount(
     transaction.add(
       createAssociatedTokenAccountInstruction(
         payer.publicKey,
-        receiverATAPublicKey,
-        receiverAddress,
+        recipientATAPublicKey,
+        recipientAddress,
         tokenMintAddress
       )
     );
@@ -222,7 +226,7 @@ async function sendTokenAmount(
     createTransferCheckedInstruction(
       senderATAPublicKey,
       tokenMintAddress,
-      receiverATAPublicKey,
+      recipientATAPublicKey,
       sender.publicKey,
       amount * Math.pow(10, DECIMALS),
       DECIMALS

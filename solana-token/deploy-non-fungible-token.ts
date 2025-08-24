@@ -37,13 +37,15 @@ function recreateWalletFromPrivateKey(privateKey: string) {
   );
 }
 
-async function createWallet() {
+function createWallet() {
   const solanaWallet = Keypair.generate();
   const privateKey = Buffer.from(solanaWallet.secretKey).toString("base64");
   const address = solanaWallet.publicKey.toBase58();
 
   console.log("private key", privateKey);
   console.log("address", address);
+
+  return solanaWallet;
 }
 
 async function requestAirdrop(wallet: Keypair) {
@@ -57,7 +59,7 @@ async function requestAirdrop(wallet: Keypair) {
 
 function createMetadataInstruction(
   tokenMintAddress: PublicKey,
-  receiverAddress: PublicKey,
+  ownerAddress: PublicKey,
   payerAddress: PublicKey
 ) {
   const [metadataPDA] = PublicKey.findProgramAddressSync(
@@ -69,15 +71,15 @@ function createMetadataInstruction(
     TOKEN_METADATA_PROGRAM_ID
   );
 
-  console.log('receiver address in metadata instruction', receiverAddress.toBase58());
+  console.log('owner address in metadata instruction', ownerAddress.toBase58());
 
   return createCreateMetadataAccountV3Instruction(
     {
       metadata: metadataPDA,
       mint: tokenMintAddress,
-      mintAuthority: receiverAddress,
+      mintAuthority: ownerAddress,
       payer: payerAddress,
-      updateAuthority: receiverAddress,
+      updateAuthority: ownerAddress,
     },
     {
       createMetadataAccountArgsV3: {
@@ -99,7 +101,7 @@ function createMetadataInstruction(
 
 function createMasterEditionInstruction(
   tokenMintAddress: PublicKey,
-  receiverAddress: PublicKey,
+  ownerAddress: PublicKey,
   payerAddress: PublicKey
 ) {
   const [metadataPDA] = PublicKey.findProgramAddressSync(
@@ -128,9 +130,9 @@ function createMasterEditionInstruction(
       metadata: metadataPDA,
       edition: masterEditionPDA,
       mint: tokenMintAddress,
-      mintAuthority: receiverAddress,
+      mintAuthority: ownerAddress,
       payer: payerAddress,
-      updateAuthority: receiverAddress,
+      updateAuthority: ownerAddress,
     },
     {
       createMasterEditionArgs: {
@@ -143,11 +145,15 @@ function createMasterEditionInstruction(
 async function deployNonFungibleToken() {
   const connection = new Connection(RPC_URL, "confirmed");
 
-  const payerKeyPayer = recreateWalletFromPrivateKey(
+  const payerKeyPair = recreateWalletFromPrivateKey(
     keysData["wallets"]["1"]["privateKey"]
   );
 
-  const receiverKeyPair = recreateWalletFromPrivateKey(
+  const recipientKeyPair = recreateWalletFromPrivateKey(
+    keysData["wallets"]["2"]["privateKey"]
+  );
+
+  const ownerKeyPair = recreateWalletFromPrivateKey(
     keysData["wallets"]["2"]["privateKey"]
   );
 
@@ -162,59 +168,57 @@ async function deployNonFungibleToken() {
 
   // Ix stands for Instruction, like Tx stands for Transaction
   const createMintIx = SystemProgram.createAccount({
-    fromPubkey: payerKeyPayer.publicKey, // to pay for account creation
+    fromPubkey: payerKeyPair.publicKey, // to pay for account creation
     newAccountPubkey: mintKeypair.publicKey, // token new address
     space: MINT_SIZE,
     lamports: requiredLamportsForMint,
     programId: TOKEN_PROGRAM_ID,
   });
 
-  console.log('receiver address in init mint instruction', receiverKeyPair.publicKey.toBase58());
-
   const initMintIx = createInitializeMintInstruction(
     mintKeypair.publicKey,
     DECIMALS,
-    receiverKeyPair.publicKey,
-    receiverKeyPair.publicKey,
+    ownerKeyPair.publicKey,
+    ownerKeyPair.publicKey,
     TOKEN_PROGRAM_ID
   );
 
-  const receiverATAPublicKey = await getAssociatedTokenAddress(
+  const recipientATAPublicKey = await getAssociatedTokenAddress(
     mintKeypair.publicKey, // mint
-    receiverKeyPair.publicKey, // owner
+    recipientKeyPair.publicKey, // owner
     false
   );
 
-  const receiverATACreationIX = createAssociatedTokenAccountInstruction(
-    payerKeyPayer.publicKey, // payer
-    receiverATAPublicKey, // receiver associated token account
-    receiverKeyPair.publicKey, // receiver public key (owner of the token account)
+  const recipientATACreationIX = createAssociatedTokenAccountInstruction(
+    payerKeyPair.publicKey, // payer
+    recipientATAPublicKey, // recipient associated token account
+    recipientKeyPair.publicKey, // recipient public key (owner of the token account)
     mintKeypair.publicKey // token mint address
   );
 
   const mintToIx = createMintToInstruction(
     mintKeypair.publicKey,
-    receiverATAPublicKey,
-    receiverKeyPair.publicKey,
+    recipientATAPublicKey,
+    ownerKeyPair.publicKey,
     INITIAL_SUPPLY
   );
 
   const createMetadataIx = createMetadataInstruction(
     mintKeypair.publicKey,
-    receiverKeyPair.publicKey,
-    payerKeyPayer.publicKey
+    ownerKeyPair.publicKey,
+    payerKeyPair.publicKey
   );
 
   const createMasterEditionIx = createMasterEditionInstruction(
     mintKeypair.publicKey,
-    receiverKeyPair.publicKey,
-    payerKeyPayer.publicKey
+    ownerKeyPair.publicKey,
+    payerKeyPair.publicKey
   );
 
   const transaction = new Transaction().add(
     createMintIx,
     initMintIx,
-    receiverATACreationIX,
+    recipientATACreationIX,
     mintToIx,
     createMetadataIx,
     createMasterEditionIx,
@@ -225,9 +229,9 @@ async function deployNonFungibleToken() {
 
   transaction.recentBlockhash = blockhash;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
-  transaction.feePayer = payerKeyPayer.publicKey;
+  transaction.feePayer = payerKeyPair.publicKey;
 
-  transaction.sign(payerKeyPayer, mintKeypair, receiverKeyPair);
+  transaction.sign(payerKeyPair, mintKeypair, ownerKeyPair);
 
   const rawTx = transaction.serialize();
 
@@ -240,7 +244,7 @@ async function sendTokenAmount(
   tokenMintAddress: PublicKey,
   payer: Keypair,
   sender: Keypair,
-  receiverAddress: PublicKey,
+  recipientAddress: PublicKey,
   amount: number
 ) {
   const connection = new Connection(RPC_URL, "confirmed");
@@ -251,14 +255,14 @@ async function sendTokenAmount(
     false
   );
 
-  const receiverATAPublicKey = await getAssociatedTokenAddress(
+  const recipientATAPublicKey = await getAssociatedTokenAddress(
     tokenMintAddress, // mint
-    receiverAddress, // owner
+    recipientAddress, // owner
     false
   );
 
   const destinationAccountInfo = await connection.getAccountInfo(
-    receiverATAPublicKey
+    recipientATAPublicKey
   );
   const transaction = new Transaction();
 
@@ -266,8 +270,8 @@ async function sendTokenAmount(
     transaction.add(
       createAssociatedTokenAccountInstruction(
         payer.publicKey,
-        receiverATAPublicKey,
-        receiverAddress,
+        recipientATAPublicKey,
+        recipientAddress,
         tokenMintAddress
       )
     );
@@ -277,7 +281,7 @@ async function sendTokenAmount(
     createTransferCheckedInstruction(
       senderATAPublicKey,
       tokenMintAddress,
-      receiverATAPublicKey,
+      recipientATAPublicKey,
       sender.publicKey,
       amount * Math.pow(10, DECIMALS),
       DECIMALS
@@ -304,19 +308,19 @@ async function mintTokenAmount(
   tokenMintAddress: PublicKey,
   payer: Keypair,
   mintAuthority: Keypair,
-  receiverAddress: PublicKey,
+  recipientAddress: PublicKey,
   amount: number
 ) {
   const connection = new Connection(RPC_URL, "confirmed");
 
-  const receiverATAPublicKey = await getAssociatedTokenAddress(
+  const recipientATAPublicKey = await getAssociatedTokenAddress(
     tokenMintAddress, // mint
-    receiverAddress, // owner
+    recipientAddress, // owner
     false
   );
 
   const destinationAccountInfo = await connection.getAccountInfo(
-    receiverATAPublicKey
+    recipientATAPublicKey
   );
   const transaction = new Transaction();
 
@@ -324,8 +328,8 @@ async function mintTokenAmount(
     transaction.add(
       createAssociatedTokenAccountInstruction(
         payer.publicKey,
-        receiverATAPublicKey,
-        receiverAddress,
+        recipientATAPublicKey,
+        recipientAddress,
         tokenMintAddress
       )
     );
@@ -334,7 +338,7 @@ async function mintTokenAmount(
   transaction.add(
     createMintToInstruction(
       tokenMintAddress,
-      receiverATAPublicKey,
+      recipientATAPublicKey,
       mintAuthority.publicKey,
       amount * Math.pow(10, DECIMALS)
     )
@@ -357,6 +361,8 @@ async function mintTokenAmount(
 }
 
 async function main() {
+  // const wallet = createWallet();
+  // await requestAirdrop(wallet);
   // await deployNonFungibleToken();
   // await sendTokenAmount(
   //   new PublicKey("6rY4EMCqUGFPhqjRp9JLw6zrgVVguEPbKScdRaXatkVG"),
@@ -365,13 +371,13 @@ async function main() {
   //   new PublicKey("A51iQm72KSwsYVrFaPye8HDo1nJUGjKaYGStKEQo4gaw"),
   //   1
   // );
-  await mintTokenAmount(
-    new PublicKey("6rY4EMCqUGFPhqjRp9JLw6zrgVVguEPbKScdRaXatkVG"),
-    recreateWalletFromPrivateKey(keysData["wallets"]["1"]["privateKey"]),
-    recreateWalletFromPrivateKey(keysData["wallets"]["2"]["privateKey"]),
-    new PublicKey("A51iQm72KSwsYVrFaPye8HDo1nJUGjKaYGStKEQo4gaw"),
-    100
-  );
+  // await mintTokenAmount(
+  //   new PublicKey("6rY4EMCqUGFPhqjRp9JLw6zrgVVguEPbKScdRaXatkVG"),
+  //   recreateWalletFromPrivateKey(keysData["wallets"]["1"]["privateKey"]),
+  //   recreateWalletFromPrivateKey(keysData["wallets"]["2"]["privateKey"]),
+  //   new PublicKey("A51iQm72KSwsYVrFaPye8HDo1nJUGjKaYGStKEQo4gaw"),
+  //   100
+  // );
 }
 
 main().catch(console.error);
