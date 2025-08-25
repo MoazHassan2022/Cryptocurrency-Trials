@@ -22,6 +22,7 @@ import {
   createCreateMetadataAccountV3Instruction,
   PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
+import bs58 from "bs58";
 
 const DECIMALS = 7;
 const INITIAL_SUPPLY = 1_000_000 * 10 ** DECIMALS;
@@ -177,6 +178,12 @@ async function deployFungibleToken() {
   transaction.feePayer = payerKeyPair.publicKey;
 
   transaction.sign(payerKeyPair, mintKeypair, ownerKeyPair);
+
+  const sigBase64 = transaction.signature.toString("base64");
+  const sigBytes = Buffer.from(sigBase64, "base64");
+  const sigBase58 = bs58.encode(sigBytes);
+
+  console.log("signatureee", sigBase58);
 
   const rawTx = transaction.serialize();
 
