@@ -183,6 +183,10 @@ async function deployFungibleToken() {
   const sigBytes = Buffer.from(sigBase64, "base64");
   const sigBase58 = bs58.encode(new Uint8Array(sigBytes));
 
+  const estimatedFee = await transaction.getEstimatedFee(connection);
+
+  console.log("estimatedFee", estimatedFee);
+
   console.log("signatureee", sigBase58);
 
   const rawTx = transaction.serialize();
