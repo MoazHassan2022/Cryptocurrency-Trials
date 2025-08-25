@@ -99,7 +99,7 @@ async function deployFungibleToken() {
   const connection = new Connection(RPC_URL, "confirmed");
 
   const payerKeyPair = recreateWalletFromPrivateKey(
-    keysData["wallets"]["1"]["privateKey"]
+    keysData["wallets"]["3"]["privateKey"]
   );
 
   const recipientKeyPair = recreateWalletFromPrivateKey(

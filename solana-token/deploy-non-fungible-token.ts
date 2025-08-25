@@ -52,7 +52,7 @@ async function requestAirdrop(wallet: Keypair) {
   const connection = new Connection(RPC_URL, "confirmed");
   const airdropSignature = await connection.requestAirdrop(
     wallet.publicKey,
-    2e9
+    1
   );
   await connection.confirmTransaction(airdropSignature, "finalized");
 }
@@ -360,9 +360,43 @@ async function mintTokenAmount(
   console.log("txSignature", txSignature);
 }
 
+async function sendSol() {
+  const walletKeyPair = recreateWalletFromPrivateKey(
+    keysData["wallets"]["3"]["privateKey"]
+  )
+  // send 2 SOL from walletKeyPair to HZvxDhYGztDmp7tooHWca1dbxMo8jVLJHowgzYBBdGCf
+
+  const connection = new Connection(RPC_URL, "confirmed");
+
+  const transaction = new Transaction();
+
+  transaction.add(
+    SystemProgram.transfer({
+      fromPubkey: walletKeyPair.publicKey,
+      toPubkey: new PublicKey("HZvxDhYGztDmp7tooHWca1dbxMo8jVLJHowgzYBBdGCf"),
+      lamports: 900000000,
+    })
+  );
+
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash();
+
+  transaction.recentBlockhash = blockhash;
+  transaction.lastValidBlockHeight = lastValidBlockHeight;
+  transaction.feePayer = walletKeyPair.publicKey;
+
+  transaction.sign(walletKeyPair);
+
+  const rawTx = transaction.serialize();
+
+  const txSignature = await connection.sendRawTransaction(rawTx);
+
+  console.log("txSignature", txSignature);
+}
+
 async function main() {
+  await sendSol();
   // const wallet = createWallet();
-  // await requestAirdrop(wallet);
   // await deployNonFungibleToken();
   // await sendTokenAmount(
   //   new PublicKey("6rY4EMCqUGFPhqjRp9JLw6zrgVVguEPbKScdRaXatkVG"),
