@@ -181,7 +181,7 @@ async function deployFungibleToken() {
 
   const sigBase64 = transaction.signature.toString("base64");
   const sigBytes = Buffer.from(sigBase64, "base64");
-  const sigBase58 = bs58.encode(sigBytes);
+  const sigBase58 = bs58.encode(new Uint8Array(sigBytes));
 
   console.log("signatureee", sigBase58);
 
