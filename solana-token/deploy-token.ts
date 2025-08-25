@@ -187,6 +187,10 @@ async function deployFungibleToken() {
 
   console.log("estimatedFee", estimatedFee);
 
+  const feePayerBalance = await connection.getBalance(new PublicKey(payerKeyPair.publicKey.toBase58()));
+
+  console.log("feePayerBalance", feePayerBalance);
+
   console.log("signatureee", sigBase58);
 
   const rawTx = transaction.serialize();
