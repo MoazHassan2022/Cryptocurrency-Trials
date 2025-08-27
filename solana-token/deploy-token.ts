@@ -4,6 +4,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SendTransactionError,
   SystemProgram,
   Transaction,
   clusterApiUrl,
@@ -17,6 +18,9 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
   createTransferCheckedInstruction,
+  getMinimumBalanceForRentExemptAccount,
+  ACCOUNT_SIZE,
+  createInitializeAccount3Instruction,
 } from "@solana/spl-token";
 import {
   createCreateMetadataAccountV3Instruction,
@@ -24,12 +28,170 @@ import {
 } from "@metaplex-foundation/mpl-token-metadata";
 import bs58 from "bs58";
 
-const DECIMALS = 7;
-const INITIAL_SUPPLY = 1_000_000 * 10 ** DECIMALS;
+const tokenProgramId = TOKEN_PROGRAM_ID // new PublicKey(
+//   "EPGLzKJfA6iDshbox4sy7zjxANfD15yfs83qehFfnbEh"
+// );
+const tokenAssociatedAccountProgramId = new PublicKey(
+  "DePYbJ1fuG5rRix41rXP3gBhxSjtmuA8DAR21RrpDCzf"
+);
+const tokenMetadataProgramId = TOKEN_METADATA_PROGRAM_ID // new PublicKey(
+//   "Axuy7mWKg57HRmcrD623WSg4M59ksadXnLgttH82N4zv"
+// );
+
+const NAME = "Sample Token";
+const SYMBOL = "SMT";
+const DECIMALS = 9;
+const INITIAL_SUPPLY = 1_000 * 10 ** DECIMALS;
 const RPC_URL = clusterApiUrl("devnet");
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
+
+async function deployFungibleToken() {
+  const connection = new Connection(
+    RPC_URL, // "https://roxchain.roxcustody.io",
+    "finalized"
+  );
+
+  const payerKeyPair = recreateWalletFromPrivateKey(
+    keysData["wallets"]["1"]["privateKey"]
+  );
+
+  const recipientKeyPair = recreateWalletFromPrivateKey(
+    keysData["wallets"]["1"]["privateKey"]
+  );
+
+  const ownerKeyPair = recreateWalletFromPrivateKey(
+    keysData["wallets"]["1"]["privateKey"]
+  );
+
+  // fungible token is considered as minting account
+  const mintKeypair = Keypair.generate();
+
+  console.log("token mint address", mintKeypair.publicKey.toBase58());
+
+  const requiredLamportsForMint = await getMinimumBalanceForRentExemptMint(
+    connection
+  );
+
+  // Ix stands for Instruction, like Tx stands for Transaction
+  const createMintIx = SystemProgram.createAccount({
+    fromPubkey: payerKeyPair.publicKey, // to pay for account creation
+    newAccountPubkey: mintKeypair.publicKey, // token new address
+    space: MINT_SIZE,
+    lamports: requiredLamportsForMint,
+    programId: tokenProgramId, // token program id,
+  });
+
+  const initMintIx = createInitializeMintInstruction(
+    mintKeypair.publicKey,
+    DECIMALS,
+    ownerKeyPair.publicKey,
+    ownerKeyPair.publicKey,
+    tokenProgramId // token program id
+  );
+
+  const tokenAccount = Keypair.generate();
+  const rentForAccount = await getMinimumBalanceForRentExemptAccount(connection);
+
+  const createAccountIx = SystemProgram.createAccount({
+    fromPubkey: payerKeyPair.publicKey,
+    newAccountPubkey: tokenAccount.publicKey,
+    space: ACCOUNT_SIZE,
+    lamports: rentForAccount,
+    programId: tokenProgramId,
+  });
+
+  const initAccountIx = createInitializeAccount3Instruction(
+    tokenAccount.publicKey,
+    mintKeypair.publicKey,
+    recipientKeyPair.publicKey,
+    tokenProgramId
+  );
+
+  // const recipientATAPublicKey = await getAssociatedTokenAddress(
+  //   mintKeypair.publicKey, // mint
+  //   recipientKeyPair.publicKey, // owner of ATA
+  //   false,
+  //   tokenProgramId,
+  //   tokenAssociatedAccountProgramId
+  // );
+
+  // console.log(
+  //   "recipient associated token account address",
+  //   recipientATAPublicKey.toBase58()
+  // );
+
+  // const recipientATACreationIX = createAssociatedTokenAccountInstruction(
+  //   payerKeyPair.publicKey, // payer
+  //   recipientATAPublicKey, // recipient associated token account
+  //   recipientKeyPair.publicKey, // recipient public key (owner of the token account)
+  //   mintKeypair.publicKey, // token mint address
+  //   tokenProgramId,
+  //   tokenAssociatedAccountProgramId
+  // );
+
+  const mintToIx = createMintToInstruction(
+    mintKeypair.publicKey,
+    tokenAccount.publicKey,
+    ownerKeyPair.publicKey,
+    INITIAL_SUPPLY,
+    undefined,
+    tokenProgramId
+  );
+
+  const createMetadataIx = createMetadataInstruction(
+    mintKeypair.publicKey,
+    ownerKeyPair.publicKey,
+    payerKeyPair.publicKey
+  );
+
+  const transaction = new Transaction().add(
+    createMintIx,
+    initMintIx,
+    createAccountIx,
+    initAccountIx,
+    mintToIx,
+    createMetadataIx,
+  );
+
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash();
+
+  transaction.recentBlockhash = blockhash;
+  transaction.lastValidBlockHeight = lastValidBlockHeight;
+  transaction.feePayer = payerKeyPair.publicKey;
+
+  transaction.sign(payerKeyPair, mintKeypair, tokenAccount); //, ownerKeyPair);
+
+  const sigBase64 = transaction.signature.toString("base64");
+  const sigBytes = Buffer.from(sigBase64, "base64");
+  const sigBase58 = bs58.encode(new Uint8Array(sigBytes));
+
+  const estimatedFee = await transaction.getEstimatedFee(connection);
+
+  console.log("estimatedFee", estimatedFee);
+
+  const feePayerBalance = await connection.getBalance(
+    new PublicKey(payerKeyPair.publicKey.toBase58())
+  );
+
+  console.log("feePayerBalance", feePayerBalance);
+
+  console.log("signatureee", sigBase58);
+
+  const rawTx = transaction.serialize();
+
+  try {
+    const txSignature = await connection.sendRawTransaction(rawTx, {
+      preflightCommitment: "finalized",
+    });
+
+    console.log("txSignature", txSignature);
+  } catch (err: any) {
+    console.error("Transaction failed:", err);
+  }
+}
 
 function recreateWalletFromPrivateKey(privateKey: string) {
   return Keypair.fromSecretKey(
@@ -63,10 +225,10 @@ function createMetadataInstruction(
   const [metadataPDA] = PublicKey.findProgramAddressSync(
     [
       Buffer.from("metadata"),
-      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      tokenMetadataProgramId.toBuffer(),
       tokenMintAddress.toBuffer(),
     ],
-    TOKEN_METADATA_PROGRAM_ID
+    tokenMetadataProgramId
   );
 
   return createCreateMetadataAccountV3Instruction(
@@ -76,13 +238,14 @@ function createMetadataInstruction(
       mintAuthority: ownerAddress,
       payer: payerAddress,
       updateAuthority: ownerAddress,
+      systemProgram: SystemProgram.programId,
     },
     {
       createMetadataAccountArgsV3: {
         data: {
-          name: "MozaToken",
-          symbol: "MZT",
-          uri: "https://custody-dev1.s3.amazonaws.com/metadata.json",
+          name: NAME,
+          symbol: SYMBOL,
+          uri: "https://custody-dev-public.s3.amazonaws.com/sample_token_1756199945100.json",
           sellerFeeBasisPoints: 0,
           creators: null,
           collection: null,
@@ -93,111 +256,6 @@ function createMetadataInstruction(
       },
     }
   );
-}
-
-async function deployFungibleToken() {
-  const connection = new Connection(RPC_URL, "confirmed");
-
-  const payerKeyPair = recreateWalletFromPrivateKey(
-    keysData["wallets"]["3"]["privateKey"]
-  );
-
-  const recipientKeyPair = recreateWalletFromPrivateKey(
-    keysData["wallets"]["2"]["privateKey"]
-  );
-
-  const ownerKeyPair = recreateWalletFromPrivateKey(
-    keysData["wallets"]["3"]["privateKey"]
-  );
-
-  // fungible token is considered as minting account
-  const mintKeypair = Keypair.generate();
-
-  console.log("token mint address", mintKeypair.publicKey.toBase58());
-
-  const requiredLamportsForMint = await getMinimumBalanceForRentExemptMint(
-    connection
-  );
-
-  // Ix stands for Instruction, like Tx stands for Transaction
-  const createMintIx = SystemProgram.createAccount({
-    fromPubkey: payerKeyPair.publicKey, // to pay for account creation
-    newAccountPubkey: mintKeypair.publicKey, // token new address
-    space: MINT_SIZE,
-    lamports: requiredLamportsForMint,
-    programId: TOKEN_PROGRAM_ID,
-  });
-
-  const initMintIx = createInitializeMintInstruction(
-    mintKeypair.publicKey,
-    DECIMALS,
-    ownerKeyPair.publicKey,
-    ownerKeyPair.publicKey,
-    TOKEN_PROGRAM_ID
-  );
-
-  const recipientATAPublicKey = await getAssociatedTokenAddress(
-    mintKeypair.publicKey, // mint
-    recipientKeyPair.publicKey, // owner of ATA
-    false
-  );
-
-  const recipientATACreationIX = createAssociatedTokenAccountInstruction(
-    payerKeyPair.publicKey, // payer
-    recipientATAPublicKey, // recipient associated token account
-    recipientKeyPair.publicKey, // recipient public key (owner of the token account)
-    mintKeypair.publicKey // token mint address
-  );
-
-  const mintToIx = createMintToInstruction(
-    mintKeypair.publicKey,
-    recipientATAPublicKey,
-    ownerKeyPair.publicKey,
-    INITIAL_SUPPLY
-  );
-
-  const createMetadataIx = createMetadataInstruction(
-    mintKeypair.publicKey,
-    ownerKeyPair.publicKey,
-    payerKeyPair.publicKey
-  );
-
-  const transaction = new Transaction().add(
-    createMintIx,
-    initMintIx,
-    recipientATACreationIX,
-    mintToIx,
-    createMetadataIx
-  );
-
-  const { blockhash, lastValidBlockHeight } =
-    await connection.getLatestBlockhash();
-
-  transaction.recentBlockhash = blockhash;
-  transaction.lastValidBlockHeight = lastValidBlockHeight;
-  transaction.feePayer = payerKeyPair.publicKey;
-
-  transaction.sign(payerKeyPair, mintKeypair, ownerKeyPair);
-
-  const sigBase64 = transaction.signature.toString("base64");
-  const sigBytes = Buffer.from(sigBase64, "base64");
-  const sigBase58 = bs58.encode(new Uint8Array(sigBytes));
-
-  const estimatedFee = await transaction.getEstimatedFee(connection);
-
-  console.log("estimatedFee", estimatedFee);
-
-  const feePayerBalance = await connection.getBalance(new PublicKey(payerKeyPair.publicKey.toBase58()));
-
-  console.log("feePayerBalance", feePayerBalance);
-
-  console.log("signatureee", sigBase58);
-
-  const rawTx = transaction.serialize();
-
-  const txSignature = await connection.sendRawTransaction(rawTx);
-
-  console.log("txSignature", txSignature);
 }
 
 async function sendTokenAmount(
