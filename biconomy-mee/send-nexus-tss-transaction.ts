@@ -3,7 +3,12 @@ import * as fs from "fs";
 import * as EVM_CHAINS from "viem/chains";
 import { http, parseEther } from "viem";
 import { createBundler, UserOperationStruct } from "@biconomy/account";
-import { createSmartAccountClient, NexusClient, toNexusAccount } from "@biconomy/abstractjs";
+import {
+  createBicoPaymasterClient,
+  createSmartAccountClient,
+  NexusClient,
+  toNexusAccount,
+} from "@biconomy/abstractjs";
 import axios from "axios";
 import { CustomSignedUserOperation, CustomUserOperation } from "types";
 import type { Account, Address, Hex, LocalAccount } from "viem";
@@ -59,7 +64,7 @@ export function signDigestWithNoParity(
 export async function createTssWallet(): Promise<TSSWallet> {
   // ask orchestrator to TSS-keygen
   const { data } = await axios.post(`${orchestratorUrl}/wallet/new`, {
-    parties: ["A", "B", "C", "D"],
+    parties: ["A", "B", "C"],
     threshold: 2,
   });
 
@@ -144,9 +149,9 @@ async function getNexusClient(wallet: TSSWallet): Promise<NexusClient> {
   const nexusClient = createSmartAccountClient({
     account: nexusAccount,
     transport: http(v3BundlerUrl),
-    // paymaster: createBicoPaymasterClient({
-    //   transport: http(v2PaymasterUrl),
-    // }),
+    paymaster: createBicoPaymasterClient({
+      transport: http(v2PaymasterUrl),
+    }),
   });
 
   console.log(
@@ -158,16 +163,7 @@ async function getNexusClient(wallet: TSSWallet): Promise<NexusClient> {
   return nexusClient;
 }
 
-async function sendNexusTSSTransaction() {
-  const nexusAccount = await getNexusClient({
-    keyId: "key-1758800711667",
-    pubkeyHex:
-      "0x04176300ca63b38979ffb5d40c476433582799341e560670300a6ecc30edf496d0ef656513149eb1de4666d40f8dffef25e7ca4cc9e03390b0b69bc0aff25b75a5",
-    address: "0x34AB3eC14298271915eFD889a6a9582791DDc4A1",
-    participants: ["A", "B"],
-    threshold: 2,
-  });
-
+async function sendNexusTSSTransaction(nexusAccount: NexusClient) {
   console.log("Testing migrated account...");
 
   const userOperation: CustomUserOperation =
@@ -219,7 +215,15 @@ async function sendNexusTSSTransaction() {
 
 async function main() {
   // await createTssWallet();
-  await sendNexusTSSTransaction();
+  const nexusAccount = await getNexusClient({
+    keyId: "key-1759051838519",
+    pubkeyHex:
+      "0x0406e9f2d0dc48ab2c3ab4c6393b5419921c662bef5db29d46ec75fa884cc3045056d869682f63c95cf8aa497faa449ad187f922cb2275c6e0a5de7db58217aa1f",
+    address: "0x5dAfE666f73e9c87d77bfd78C34471694a9F86AF",
+    participants: ["A", "B"],
+    threshold: 2,
+  });
+  await sendNexusTSSTransaction(nexusAccount);
 }
 
 main().catch(console.error);
