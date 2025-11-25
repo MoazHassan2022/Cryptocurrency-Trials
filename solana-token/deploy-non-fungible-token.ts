@@ -26,7 +26,7 @@ import {
 
 const DECIMALS = 0;
 const INITIAL_SUPPLY = 1 * 10 ** DECIMALS;
-const RPC_URL = clusterApiUrl("devnet");
+const RPC_URL = "https://roxchain-dev.roxcustody.io";
 
 const keysPath = join(process.cwd(), "account-secrets.json");
 const keysData = JSON.parse(fs.readFileSync(keysPath, "utf8"));
@@ -362,7 +362,7 @@ async function mintTokenAmount(
 
 async function sendSol() {
   const walletKeyPair = recreateWalletFromPrivateKey(
-    keysData["wallets"]["3"]["privateKey"]
+    keysData["wallets"]["4"]["privateKey"]
   )
   // send 2 SOL from walletKeyPair to HZvxDhYGztDmp7tooHWca1dbxMo8jVLJHowgzYBBdGCf
 
@@ -373,8 +373,8 @@ async function sendSol() {
   transaction.add(
     SystemProgram.transfer({
       fromPubkey: walletKeyPair.publicKey,
-      toPubkey: new PublicKey("HZvxDhYGztDmp7tooHWca1dbxMo8jVLJHowgzYBBdGCf"),
-      lamports: 900000000,
+      toPubkey: new PublicKey("ETBM281kU5HmB7ii4Yydy1qgNiu7249CPSCmc2PJgxPQ"),
+      lamports: 900000,
     })
   );
 
