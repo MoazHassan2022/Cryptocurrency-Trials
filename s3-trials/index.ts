@@ -41,7 +41,7 @@ async function getEnvObjectNames(env: string): Promise<string[]> {
       res.Contents?.map((o) => o.Key).filter((k): k is string => !!k) ?? [];
 
     for (const key of keys) {
-      if (key.toLocaleLowerCase().includes(env)) matched.push(key);
+      if (key.toLocaleLowerCase().includes(env) && !key.toLocaleLowerCase().includes('dev-server')) matched.push(key);
     }
 
     if (res.IsTruncated && res.NextContinuationToken) {
@@ -147,9 +147,9 @@ async function deleteKeysBatch(keys: string[]) {
 }
 
 async function main() {
-  const objectNames = await getEnvObjectNames("prod");
+  // const objectNames = await getEnvObjectNames("dev");
 
-  console.log(`Found ${objectNames.length} object names`);
+  // console.log(`Found ${objectNames.length} object names`);
   
   // await writeMatchedKeys(objectNames);
 
