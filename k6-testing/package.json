@@ -1,0 +1,28 @@
+{
+  "name": "k6-testing",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "bundle": "webpack",
+    "test": "k6 run dist/$npm_config_name.bundle.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "description": "",
+  "dependencies": {
+    "@types/k6": "^1.4.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/webpack": "5.28.5",
+    "ts-loader": "^9.5.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2",
+    "webpack": "5.94.0",
+    "webpack-cli": "5.1.4",
+    "webpack-glob-entries": "^1.0.1"
+  }
+}
