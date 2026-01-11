@@ -2,6 +2,7 @@ import { sleep, check } from 'k6';
 import { Options } from 'k6/options';
 import http from 'k6/http';
 import { loadEnv } from '../env-helper';
+import exec from 'k6/execution';
 
 export const options: Options = {
   scenarios: {
@@ -32,12 +33,29 @@ export function setup() {
 }
 
 export function createClients(data: { token: string }) {
-  const res = http.get('http://rox.localhost:4000/');
-  check(res, {
-    'createClients status is 200': () => res.status === 200,
+  const index = exec.scenario.iterationInTest + 901;
+
+  const payload = JSON.stringify({
+    id: `client${index}`,
   });
-  sleep(1);
-};
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-ACCESS-TOKEN': data.token,
+  };
+
+  const res = http.post(
+    'http://rox.localhost:4000/api/integration/clients/create',
+    payload,
+    { headers }
+  );
+
+  check(res, {
+    'createClients status is 201': (r) => r.status === 201,
+  });
+
+  sleep(0.001);
+}
 
 export function teardown(data: { token: string }) {
   console.log(`Teardown with token: ${data.token}`);
