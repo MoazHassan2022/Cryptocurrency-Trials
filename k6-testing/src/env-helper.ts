@@ -1,7 +1,6 @@
 export function loadEnv(): Record<string, string> {
   const path = '../.env';
   const envFile = open(path);
-  console.log(`Loading environment variables from ${envFile}`);
   const env: Record<string, string> = {};
 
   envFile.split("\n").forEach((line) => {
@@ -12,8 +11,6 @@ export function loadEnv(): Record<string, string> {
     const value = rest.join("=").trim();
     env[key.trim()] = value;
   });
-
-  console.log(`Loaded environment variables: ${JSON.stringify(env)}`);
 
   return env;
 }
