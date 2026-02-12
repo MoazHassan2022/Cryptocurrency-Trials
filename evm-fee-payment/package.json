@@ -11,12 +11,7 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
-    "@biconomy/abstractjs": "^1.1.21",
-    "@biconomy/account": "^4.5.7",
-    "axios": "^1.10.0",
-    "erc-20-abi": "^1.0.1",
-    "ethers": "^6.16.0",
-    "viem": "^2.45.1",
+    "solc": "^0.8.33",
     "web3": "^4.16.0"
   },
   "devDependencies": {

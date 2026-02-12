@@ -1,7 +1,11 @@
 import "dotenv/config";
 import { join } from "path";
 import * as fs from "fs";
-import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from "@aws-sdk/client-s3";
 
 function mustGet(name: string): string {
   const v = process.env[name];
@@ -34,15 +38,30 @@ async function getEnvObjectNames(env: string): Promise<string[]> {
         Bucket: bucket,
         ContinuationToken: token,
         MaxKeys: 1000,
-      })
+      }),
     );
 
     const keys =
       res.Contents?.map((o) => o.Key).filter((k): k is string => !!k) ?? [];
 
     for (const key of keys) {
-      if (key.toLocaleLowerCase().includes(env) && !key.toLocaleLowerCase().includes('dev-server')) matched.push(key);
+      const lower = key.toLowerCase();
+
+      // extract numbers separated by -
+      const match = lower.match(/\d+/g); // ["1", "2", ...]
+
+      const secondNumberIsTwo = match && match.length >= 2 && match[1] === "2";
+
+      if (
+        lower.includes(env) &&
+        !lower.includes("dev-server") &&
+        secondNumberIsTwo
+      ) {
+        matched.push(key);
+      }
     }
+
+    console.log('matches', matched);
 
     if (res.IsTruncated && res.NextContinuationToken) {
       token = res.NextContinuationToken;
@@ -50,11 +69,15 @@ async function getEnvObjectNames(env: string): Promise<string[]> {
       break;
     }
 
-    console.log(`Processed page ${page}, found ${matched.length} matches so far...`);
+    console.log(
+      `Processed page ${page}, found ${matched.length} matches so far...`,
+    );
     page++;
   }
 
-  console.log(`Processed page ${page}, found ${matched.length} matches in total.`);
+  console.log(
+    `Processed page ${page}, found ${matched.length} matches in total.`,
+  );
 
   return matched;
 }
@@ -99,10 +122,12 @@ async function deleteKeysBatch(keys: string[]) {
             Objects: batch.map((Key) => ({ Key })),
             Quiet: false,
           },
-        })
+        }),
       );
 
-      const deleted = res.Deleted?.map((d) => d.Key).filter(Boolean) as string[] | undefined;
+      const deleted = res.Deleted?.map((d) => d.Key).filter(Boolean) as
+        | string[]
+        | undefined;
       const errors = res.Errors ?? [];
 
       if (deleted?.length) success.push(...deleted);
@@ -118,7 +143,7 @@ async function deleteKeysBatch(keys: string[]) {
       console.log(
         `Batch ${b + 1}/${batches.length}: requested=${batch.length}, deleted=${
           deleted?.length ?? 0
-        }, failed=${errors.length}`
+        }, failed=${errors.length}`,
       );
     } catch (e: any) {
       // If the whole batch request fails (permissions/network), mark all keys as failed
@@ -133,11 +158,11 @@ async function deleteKeysBatch(keys: string[]) {
 
   fs.writeFileSync(
     join(__dirname, "delete-success.txt"),
-    success.join("\n") + (success.length ? "\n" : "")
+    success.join("\n") + (success.length ? "\n" : ""),
   );
   fs.writeFileSync(
     join(__dirname, "delete-failed.json"),
-    JSON.stringify(failed, null, 2)
+    JSON.stringify(failed, null, 2),
   );
 
   console.log(`\nDelete summary:`);
@@ -147,11 +172,11 @@ async function deleteKeysBatch(keys: string[]) {
 }
 
 async function main() {
-  // const objectNames = await getEnvObjectNames("dev");
+  const objectNames = await getEnvObjectNames("prod");
 
-  // console.log(`Found ${objectNames.length} object names`);
-  
-  // await writeMatchedKeys(objectNames);
+  console.log(`Found ${objectNames.length} object names`);
+
+  await writeMatchedKeys(objectNames);
 
   // const objectNames = await readMatchedKeys();
 

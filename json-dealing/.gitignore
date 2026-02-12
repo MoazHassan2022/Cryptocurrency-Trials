@@ -13,5 +13,4 @@ node_modules
 /coverage
 /coverage.json
 
-delete-failed.json
-matched-keys.json
+data.json

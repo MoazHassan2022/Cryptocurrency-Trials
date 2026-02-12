@@ -1,0 +1,12 @@
+{
+  "wallets": {
+    "feePayer": {
+      "privateKey": "0xb3593e055da85e6a77dbc02425fcdfef8ae1e53f4b286bb300bc0637af98b88c",
+      "address": "0x7B844E6d4b706bDDAFF3f437Ef0defdCa78253dF"
+    },
+    "user": {
+      "privateKey": "0x762c3309fd2f6c0d91e641f64162753fac0c0f984733262274b0182b235b0276",
+      "address": "0x183A018021A2D0456507C4468cfaee5F96329495"
+    }
+  }
+}

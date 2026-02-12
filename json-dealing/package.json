@@ -1,5 +1,5 @@
 {
-  "name": "biconomy",
+  "name": "json-dealing",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -11,13 +11,6 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
-    "@biconomy/abstractjs": "^1.1.21",
-    "@biconomy/account": "^4.5.7",
-    "axios": "^1.10.0",
-    "erc-20-abi": "^1.0.1",
-    "ethers": "^6.16.0",
-    "viem": "^2.45.1",
-    "web3": "^4.16.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
