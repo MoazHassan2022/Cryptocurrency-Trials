@@ -4,7 +4,7 @@ import { join } from "path";
 import solc from "solc";
 
 // === CONFIG ===
-const RPC_URL = ""; // Fill your RPC URL
+const RPC_URL = "https://sepolia.base.org";
 const WALLETS_JSON = join(process.cwd(), "wallets.json");
 
 let keysData: { wallets: { [key: string]: { privateKey?: string; address: string } } };
@@ -53,48 +53,66 @@ async function sendSignedFundedTransaction() {
     console.log("Created user wallet:", keysData.wallets.user.address);
     saveKeys();
   }
-  // const user = keysData.wallets.user;
+  const user = keysData.wallets.user;
 
-  // // 3️⃣ Compile & deploy user contract wallet
-  // const { abi, bytecode } = compileContract();
-  // const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
-  // web3.eth.accounts.wallet.add(feePayerAccount);
+  // 3️⃣ Compile & deploy user contract wallet
+  const { abi, bytecode } = compileContract();
+  const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
+  web3.eth.accounts.wallet.add(feePayerAccount);
 
-  // let contractAddress = keysData.wallets.userContract?.address;
-  // if (!contractAddress) {
-  //   const contract = new web3.eth.Contract(abi);
-  //   const deployTx = contract.deploy({ data: "0x" + bytecode, arguments: [user.address] });
-  //   const gas = await deployTx.estimateGas();
-  //   const txReceipt = await deployTx.send({ from: feePayer.address, gas });
-  //   console.log("User contract deployed at:", txReceipt.options.address);
-  //   contractAddress = txReceipt.options.address;
-  //   keysData.wallets.userContract = { address: contractAddress };
-  //   saveKeys();
-  // }
+  let contractAddress = keysData.wallets.userContract?.address;
+  if (!contractAddress) {
+    const contract = new web3.eth.Contract(abi);
+    const deployTx = contract.deploy({ data: "0x" + bytecode, arguments: [user.address] });
+    const gas = await deployTx.estimateGas();
+    console.log("gasss", gas);
+    const txReceipt = await deployTx.send({ from: feePayer.address, gas: gas.toString() });
+    console.log("User contract deployed at:", txReceipt.options.address);
+    contractAddress = txReceipt.options.address;
+    keysData.wallets.userContract = { address: contractAddress };
+    saveKeys();
+  }
 
-  // // 4️⃣ Build meta-transaction
-  // const contract = new web3.eth.Contract(abi, contractAddress);
-  // const nonce = await contract.methods.nonce().call();
+  console.log('User wallet contract is found at', contractAddress);
 
-  // const to = user.address; // Example: send to yourself
-  // const value = web3.utils.toWei("0.001", "ether");
-  // const data = "0x";
+  // 4️⃣ Build meta-transaction
+  const contract = new web3.eth.Contract(abi, contractAddress);
+  const nonce = await contract.methods.nonce().call();
 
-  // const hash = web3.utils.soliditySha3(
-  //   { t: "address", v: contractAddress },
-  //   { t: "address", v: to },
-  //   { t: "uint256", v: value },
-  //   { t: "bytes", v: data },
-  //   { t: "uint256", v: nonce }
-  // );
+  console.log("Nonce:", nonce);
 
-  // const signature = web3.eth.accounts.sign(hash!, user.privateKey).signature;
+  const to = "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68";
+  const value = web3.utils.toWei("0.00000001", "ether");
+  const data = "0x";
 
-  // // 5️⃣ Send transaction from fee payer
-  // const tx = contract.methods.execute(to, value, data, signature);
-  // const gasEstimate = await tx.estimateGas({ from: feePayer.address, value: 0 });
-  // const receipt = await tx.send({ from: feePayer.address, gas: gasEstimate });
-  // console.log("Transaction sent by fee payer, tx hash:", receipt.transactionHash);
+  const hash = web3.utils.soliditySha3(
+    { t: "address", v: contractAddress },
+    { t: "address", v: to },
+    { t: "uint256", v: value },
+    { t: "bytes", v: data },
+    { t: "uint256", v: nonce }
+  );
+
+  const signature = web3.eth.accounts.sign(hash, user.privateKey).signature;
+
+  console.log("Signature:", signature);
+
+  // 5️⃣ Send transaction from fee payer
+  const tx = contract.methods.execute(to, value, data, signature);
+
+  console.log("Sending transaction from fee payer, tx", tx);
+  const gasEstimate = await tx.estimateGas({ from: feePayer.address });
+
+  console.log("Gas estimate:", gasEstimate);
+  const receipt = await tx.send({ from: feePayer.address, gas: gasEstimate.toString() });
+
+  console.log("Transaction sent by fee payer, tx hash:", receipt.transactionHash);
+
+
+  // TODOs:
+  // Get secure contract with nonce management
+  // Calculate address first (separate function), fill it
+  // Send only one tx (deploy and transfer) in this function
 }
 
 // === MAIN SCRIPT ===
