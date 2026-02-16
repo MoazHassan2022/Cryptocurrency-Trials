@@ -1,17 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @title CREATE2 Factory for deterministic UserWallet deployment
-/// @notice Deploys contracts at deterministic addresses using CREATE2
+interface IUserWallet {
+    function execute(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        bytes calldata signature
+    ) external;
+}
+
 contract Factory {
-    /// @notice Deploy a contract using CREATE2
-    /// @param salt A unique salt for deterministic address
-    /// @param bytecode The init code of the contract to deploy
-    /// @return addr The deployed contract address
-    function deploy(bytes32 salt, bytes memory bytecode) external returns(address addr) {
+
+    function deployAndExecute(
+        bytes32 salt,
+        bytes memory initCode,
+        address to,
+        uint256 value,
+        bytes calldata data,
+        bytes calldata signature
+    ) external payable returns (address wallet) {
+
         assembly {
-            addr := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
-            if iszero(extcodesize(addr)) { revert(0, 0) } // revert if deployment failed
+            wallet := create2(0, add(initCode, 0x20), mload(initCode), salt)
+            if iszero(extcodesize(wallet)) { revert(0, 0) }
         }
+
+        IUserWallet(wallet).execute(to, value, data, signature);
     }
 }

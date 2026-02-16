@@ -64,15 +64,12 @@ async function deployFactoryContract(): Promise<string> {
   // 1️⃣ Load or create fee payer wallet
   const feePayer = loadOrCreateWallet("feePayer");
 
-  // 2️⃣ Load or create user wallet
-  const user = loadOrCreateWallet("user");
-
   const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
   web3.eth.accounts.wallet.add(feePayerAccount);
 
   const contract = new web3.eth.Contract(abi);
 
-  const deployTx = contract.deploy({ data: "0x" + bytecode, arguments: [user.address] });
+  const deployTx = contract.deploy({ data: "0x" + bytecode });
 
   const gasEstimate = await deployTx.estimateGas();
   const txReceipt = await deployTx.send({ from: feePayer.address, gas: gasEstimate.toString() });
@@ -191,42 +188,23 @@ async function main() {
   // await deployFactoryContract();
   // predictUserWalletAddress();
   // await deployUserWalletWithFactory();
-  await sendSignedFundedTransaction();
+  await deployOrExecute();
 }
 
 main().catch(console.error);
 
-
-async function sendSignedFundedTransaction() {
-  // 1️⃣ Load or create fee payer wallet
+async function executeOnly() {
+  const user = loadOrCreateWallet("user");
   const feePayer = loadOrCreateWallet("feePayer");
 
-  // 2️⃣ Load or create user wallet
-  const user = loadOrCreateWallet("user");
-
-  // 3️⃣ Compile & deploy user contract wallet
-  const { abi, bytecode } = compileContract("UserWallet.sol");
   const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
   web3.eth.accounts.wallet.add(feePayerAccount);
 
-  let contractAddress = walletsData.user?.contractAddress;
-  if (!contractAddress) {
-    const contract = new web3.eth.Contract(abi);
-    const deployTx = contract.deploy({ data: "0x" + bytecode, arguments: [user.address] });
-    const gasEstimate = await deployTx.estimateGas();
-    console.log("gasss", gasEstimate);
-    const txReceipt = await deployTx.send({ from: feePayer.address, gas: gasEstimate.toString() });
-    console.log("User contract deployed at:", txReceipt.options.address);
-    contractAddress = txReceipt.options.address;
-    walletsData.user.contractAddress = contractAddress;
-    saveWallets();
-  }
+  const { abi } = compileContract("UserWallet.sol");
 
-  console.log('User wallet contract is found at', contractAddress);
+  const walletContract = new web3.eth.Contract(abi, user.contractAddress);
 
-  // 4️⃣ Build meta-transaction
-  const contract = new web3.eth.Contract(abi, contractAddress);
-  const nonce = await contract.methods.nonce().call();
+  const nonce = await walletContract.methods.nonce().call();
 
   console.log("Nonce:", nonce);
 
@@ -235,7 +213,7 @@ async function sendSignedFundedTransaction() {
   const data = "0x";
 
   const hash = web3.utils.soliditySha3(
-    { t: "address", v: contractAddress },
+    { t: "address", v: user.contractAddress },
     { t: "address", v: to },
     { t: "uint256", v: value },
     { t: "bytes", v: data },
@@ -247,7 +225,7 @@ async function sendSignedFundedTransaction() {
   console.log("Signature:", signature);
 
   // 5️⃣ Send transaction from fee payer
-  const tx = contract.methods.execute(to, value, data, signature);
+  const tx = walletContract.methods.execute(to, value, data, signature);
 
   console.log("Sending transaction from fee payer, tx", tx);
   const gasEstimate = await tx.estimateGas({ from: feePayer.address });
@@ -256,10 +234,82 @@ async function sendSignedFundedTransaction() {
   const receipt = await tx.send({ from: feePayer.address, gas: gasEstimate.toString() });
 
   console.log("Transaction sent by fee payer, tx hash:", receipt.transactionHash);
+}
 
+async function deployAndExecute() {
+  const user = loadOrCreateWallet("user");
+  const feePayer = loadOrCreateWallet("feePayer");
 
-  // TODOs:
-  // Get secure contract with nonce management
-  // Calculate address first (separate function), fill it
-  // Send only one tx (deploy and transfer) in this function
+  const factoryAddress = walletsData.factory?.address;
+  if (!factoryAddress) throw new Error("Factory not deployed");
+
+  const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
+  web3.eth.accounts.wallet.add(feePayerAccount);
+
+  const { bytecode } = compileContract("UserWallet.sol");
+
+  console.log("UserWallet bytecode:", bytecode);
+
+  const constructorEncoded = web3.eth.abi.encodeParameters(
+    ["address"],
+    [user.address]
+  ).slice(2); // remove 0x
+
+  const initCode = bytecode + constructorEncoded;
+
+  console.log("UserWallet init code:", initCode);
+
+  const predictedAddress = predictUserWalletAddress();
+
+  console.log("Deploying UserWallet to:", predictedAddress);
+
+  const salt = web3.utils.soliditySha3(user.address);
+
+  console.log("UserWallet salt:", salt);
+
+  const { abi: factoryAbi } = compileContract("Factory.sol");
+  const factory = new web3.eth.Contract(factoryAbi, factoryAddress);
+
+  const nonce = 0;
+  const to = "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68";
+  const value = web3.utils.toWei("0.00000001", "ether");
+  const data = "0x";
+
+  const hash = web3.utils.soliditySha3(
+    { t: "address", v: predictedAddress },
+    { t: "address", v: to },
+    { t: "uint256", v: value },
+    { t: "bytes", v: data },
+    { t: "uint256", v: nonce }
+  );
+
+  const signature = web3.eth.accounts.sign(hash!, user.privateKey).signature;
+
+  console.log("Signature:", signature);
+
+  const deployTx = factory.methods.deployAndExecute(salt, "0x" + initCode, to, value, data, signature);
+
+  const gasEstimate = await deployTx.estimateGas();
+  const receipt = await deployTx.send({ from: feePayer.address, gas: gasEstimate.toString() });
+
+  console.log("Transaction sent by fee payer, tx hash:", receipt.transactionHash);
+}
+
+async function deployOrExecute() {
+  const user = loadOrCreateWallet("user");
+  const feePayer = loadOrCreateWallet("feePayer");
+
+  const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
+  web3.eth.accounts.wallet.add(feePayerAccount);
+
+  const code = await web3.eth.getCode(user.contractAddress);
+  const isDeployed = code !== "0x";
+
+  console.log("Is deployed:", isDeployed);
+
+  if (isDeployed) {
+    executeOnly();
+  } else {
+    deployAndExecute();
+  }
 }
