@@ -4,6 +4,7 @@ import { join } from "path";
 import solc from "solc";
 
 // === CONFIG ===
+// const RPC_URL = "https://sepolia.base.org";
 const RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
 const WALLETS_JSON = join(process.cwd(), "wallets.json");
 const CONTRACTS_PATH = join(process.cwd(), "contracts");
@@ -133,61 +134,10 @@ function predictUserWalletAddress() {
   return predictedAddress;
 }
 
-async function deployUserWalletWithFactory() {
-  const user = loadOrCreateWallet("user");
-
-  const factoryAddress = walletsData.factory?.address;
-  if (!factoryAddress) {
-    throw new Error("Factory contract address not found");
-  }
-
-  const feePayer = loadOrCreateWallet("feePayer");
-
-  const feePayerAccount = web3.eth.accounts.privateKeyToAccount(feePayer.privateKey);
-  web3.eth.accounts.wallet.add(feePayerAccount);
-
-  const { bytecode } = compileContract("UserWallet.sol");
-
-  console.log("UserWallet bytecode:", bytecode);
-
-  const constructorEncoded = web3.eth.abi.encodeParameters(
-    ["address"],
-    [user.address]
-  ).slice(2); // remove 0x
-
-  const initCode = bytecode + constructorEncoded;
-
-  console.log("UserWallet init code:", initCode);
-
-  const predictedAddress = predictUserWalletAddress();
-
-  console.log("Deploying UserWallet to:", predictedAddress);
-
-  const salt = web3.utils.soliditySha3(user.address);
-
-  console.log("UserWallet salt:", salt);
-
-  // 4️⃣ Prepare Factory contract instance
-  const { abi: factoryAbi } = compileContract("Factory.sol");
-  const factory = new web3.eth.Contract(factoryAbi, factoryAddress);
-
-  // 5️⃣ Call deploy(salt, initCode) on the factory
-  const deployTx = factory.methods.deploy(salt, "0x" + initCode);
-
-  const gasEstimate = await deployTx.estimateGas();
-  const receipt = await deployTx.send({ from: feePayer.address, gas: gasEstimate.toString() });
-
-  console.log("UserWallet deployed! Tx hash:", receipt.transactionHash);
-  console.log("Deployed at address:", predictedAddress);
-
-  return predictedAddress;
-}
-
 // === MAIN SCRIPT ===
 async function main() {
   // await deployFactoryContract();
   // predictUserWalletAddress();
-  // await deployUserWalletWithFactory();
   await deployOrExecute();
 }
 
