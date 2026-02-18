@@ -1,31 +1,47 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/proxy/Clones.sol";
+
 interface IUserWallet {
+    function initialize(address _owner) external;
     function execute(
         address to,
         uint256 value,
         bytes calldata data,
+        bytes32 hash,
         bytes calldata signature
-    ) external;
+    ) external payable;
 }
 
 contract Factory {
+    using Clones for address;
+
+    address public immutable implementation;
+
+    constructor(address _implementation) {
+        implementation = _implementation;
+    }
 
     function deployAndExecute(
         bytes32 salt,
-        bytes memory initCode,
+        address owner,
         address to,
         uint256 value,
         bytes calldata data,
+        bytes32 hash,
         bytes calldata signature
     ) external payable returns (address wallet) {
+        wallet = implementation.cloneDeterministic(salt);
 
-        assembly {
-            wallet := create2(0, add(initCode, 0x20), mload(initCode), salt)
-            if iszero(extcodesize(wallet)) { revert(0, 0) }
-        }
+        IUserWallet(wallet).initialize(owner);
 
-        IUserWallet(wallet).execute(to, value, data, signature);
+        IUserWallet(wallet).execute{value: msg.value}(
+            to,
+            value,
+            data,
+            hash,
+            signature
+        );
     }
 }
