@@ -16,9 +16,12 @@ contract UserWallet {
         address to,
         uint256 value,
         bytes calldata data,
-        bytes32 hash,
         bytes calldata signature
     ) external payable {
+        bytes32 hash = keccak256(
+            abi.encodePacked(address(this), to, value, data, nonce)
+        );
+
         address signer = _recover(hash, signature);
         if (signer != owner) revert InvalidSignature();
 

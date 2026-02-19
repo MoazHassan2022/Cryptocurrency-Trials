@@ -9,19 +9,24 @@ const RPC_URL = "https://sepolia.base.org";
 const WALLETS_JSON = join(process.cwd(), "wallets.json");
 const CONTRACTS_PATH = join(process.cwd(), "contracts");
 
+const web3 = new Web3(RPC_URL);
+
+// Fixed salts for multi-chain deterministic addresses
+const IMPLEMENTATION_SALT = web3.utils.keccak256("USER_WALLET_IMPLEMENTATION_CONTRACT_V1");
+const FACTORY_SALT = web3.utils.keccak256("FACTORY_CONTRACT_V1");
+const UNIVERSAL_CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
+
 let walletsData: {
   feePayer?: { privateKey: string; address: string };
-  user?: { privateKey: string; address: string; contractAddress?: string };
-  factory?: { address: string };
   implementation?: { address: string };
+  factory?: { address: string };
+  user?: { privateKey: string; address: string; contractAddress?: string };
 } = {};
 if (fs.existsSync(WALLETS_JSON)) {
   walletsData = JSON.parse(fs.readFileSync(WALLETS_JSON, "utf8"));
 } else {
   walletsData = {};
 }
-
-const web3 = new Web3(RPC_URL);
 
 function generateWallet() {
   const account = web3.eth.accounts.create();
@@ -49,19 +54,26 @@ function findImports(importPath: string) {
 }
 
 function compileContract(fileName: string) {
-  const contractPath = join(CONTRACTS_PATH, fileName);
-  const source = fs.readFileSync(contractPath, "utf8");
-  const input = {
-    language: "Solidity",
-    sources: { [fileName]: { content: source } },
-    settings: { outputSelection: { "*": { "*": ["abi", "evm.bytecode"] } } },
-  };
-  const output = JSON.parse(
-    solc.compile(JSON.stringify(input), { import: findImports }),
-  );
-  const contractFile =
-    output.contracts[fileName][Object.keys(output.contracts[fileName])[0]];
-  return { abi: contractFile.abi, bytecode: contractFile.evm.bytecode.object };
+  try {
+    const contractPath = join(CONTRACTS_PATH, fileName);
+    const source = fs.readFileSync(contractPath, "utf8");
+    const input = {
+      language: "Solidity",
+      sources: { [fileName]: { content: source } },
+      settings: { outputSelection: { "*": { "*": ["abi", "evm.bytecode"] } } },
+    };
+    const output = JSON.parse(
+      solc.compile(JSON.stringify(input), { import: findImports }),
+    );
+    const contractFile =
+      output.contracts[fileName][Object.keys(output.contracts[fileName])[0]];
+    return {
+      abi: contractFile.abi,
+      bytecode: contractFile.evm.bytecode.object,
+    };
+  } catch (e) {
+    throw new Error(`Error compiling contract: ${e}`);
+  }
 }
 
 function loadOrCreateWallet(keyName: string) {
@@ -85,91 +97,110 @@ async function getMaxFeePerGasData() {
   const maxFeePerGas =
     (baseFee * BigInt(150)) / BigInt(100) + BigInt(maxPriorityFeePerGas);
 
-  return { maxFeePerGas, maxPriorityFeePerGas };
+  return { maxFeePerGas: maxFeePerGas.toString(), maxPriorityFeePerGas };
 }
 
-async function deployUserWalletImplementation(): Promise<string> {
-  // TODO: deploy this using create2 by parent factory (to be same address in all networks)
-  if (walletsData.implementation?.address) {
-    console.log(
-      "UserWallet implementation already deployed at:",
-      walletsData.implementation.address,
-    );
-    return walletsData.implementation.address;
-  }
-
-  const { abi, bytecode } = compileContract("UserWallet.sol");
-
-  const feePayer = loadOrCreateWallet("feePayer");
-  const feePayerAccount = web3.eth.accounts.privateKeyToAccount(
-    feePayer.privateKey,
+function predictUniversalAddress(saltHex: string, initCodeHex: string) {
+  const initCodeHash = web3.utils.keccak256(initCodeHex);
+  return web3.utils.toChecksumAddress(
+    "0x" +
+      web3.utils
+        .keccak256(
+          "0xff" +
+            UNIVERSAL_CREATE2_FACTORY.slice(2) +
+            saltHex.slice(2) +
+            initCodeHash.slice(2),
+        )
+        .slice(-40),
   );
-  web3.eth.accounts.wallet.add(feePayerAccount);
-
-  const contract = new web3.eth.Contract(abi);
-
-  const deployTx = contract.deploy({ data: "0x" + bytecode });
-
-  const { maxFeePerGas, maxPriorityFeePerGas } = await getMaxFeePerGasData();
-
-  const gasEstimate = await deployTx.estimateGas();
-  const deployed = await deployTx.send({
-    from: feePayer.address,
-    gas: gasEstimate.toString(),
-    maxFeePerGas: maxFeePerGas.toString(),
-    maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
-  });
-
-  const implementationAddress = deployed.options.address;
-
-  walletsData.implementation = { address: implementationAddress };
-  saveWallets();
-
-  console.log("UserWallet implementation deployed at:", implementationAddress);
-  return implementationAddress;
 }
 
-async function deployFactoryContract(): Promise<string> {
-  if (walletsData.factory?.address) {
-    console.log("Factory already deployed at:", walletsData.factory.address);
-    return walletsData.factory.address;
-  }
+function predictCoreAddresses() {
+  const { bytecode: implementationBytecode } =
+    compileContract("UserWallet.sol");
+  const { bytecode: factoryBytecode } = compileContract("Factory.sol");
 
-  if (!walletsData.implementation?.address) {
-    throw new Error("UserWallet implementation not deployed");
-  }
-
-  const { abi, bytecode } = compileContract("Factory.sol");
-
-  const feePayer = loadOrCreateWallet("feePayer");
-  const feePayerAccount = web3.eth.accounts.privateKeyToAccount(
-    feePayer.privateKey,
+  // Predict Implementation Address
+  const predictedUserWalletImplementationAddress = predictUniversalAddress(
+    IMPLEMENTATION_SALT,
+    "0x" + implementationBytecode,
   );
-  web3.eth.accounts.wallet.add(feePayerAccount);
 
-  const contract = new web3.eth.Contract(abi);
+  // Predict Factory Address (Need to append constructor args to bytecode)
+  const encodedArgs = web3.eth.abi
+    .encodeParameters(["address"], [predictedUserWalletImplementationAddress])
+    .slice(2);
+  const factoryInitCode = "0x" + factoryBytecode + encodedArgs;
 
-  const deployTx = contract.deploy({
-    data: "0x" + bytecode,
-    arguments: [walletsData.implementation.address],
-  });
+  const predictedFactoryAddress = predictUniversalAddress(
+    FACTORY_SALT,
+    factoryInitCode,
+  );
 
-  const { maxFeePerGas, maxPriorityFeePerGas } = await getMaxFeePerGasData();
+  console.log(
+    "Predicted Implementation:",
+    predictedUserWalletImplementationAddress,
+  );
+  console.log("Predicted Factory:", predictedFactoryAddress);
 
-  const gasEstimate = await deployTx.estimateGas();
-  const deployed = await deployTx.send({
-    from: feePayer.address,
-    gas: gasEstimate.toString(),
-    maxFeePerGas: maxFeePerGas.toString(),
-    maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
-  });
-
-  const factoryAddress = deployed.options.address;
-  walletsData.factory = { address: factoryAddress };
+  walletsData.implementation = {
+    address: predictedUserWalletImplementationAddress,
+  };
+  walletsData.factory = { address: predictedFactoryAddress };
   saveWallets();
 
-  console.log("Factory deployed at:", factoryAddress);
-  return factoryAddress;
+  return {
+    predictedUserWalletImplementationAddress,
+    predictedFactoryAddress,
+    implementationInitCode: "0x" + implementationBytecode,
+    factoryInitCode,
+  };
+}
+
+// Generic deployer for all networks that uses CREATE2
+async function deployUniversal(salt: string, bytecode: string, label: string) {
+    const feePayer = walletsData.feePayer;
+    web3.eth.accounts.wallet.add(web3.eth.accounts.privateKeyToAccount(feePayer.privateKey));
+    
+    // The Arachnid Factory takes [SALT (32 bytes)][BYTECODE]
+    const data = salt + bytecode.replace("0x", "");
+    const { maxFeePerGas, maxPriorityFeePerGas } = await getMaxFeePerGasData();
+
+    console.log(`Deploying ${label}...`);
+    const gasEstimate = await web3.eth.estimateGas({ from: feePayer.address, to: UNIVERSAL_CREATE2_FACTORY, data });
+    
+    await web3.eth.sendTransaction({
+        from: feePayer.address,
+        to: UNIVERSAL_CREATE2_FACTORY,
+        data: data,
+        gas: gasEstimate.toString(),
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+    });
+    console.log(`${label} deployed successfully!`);
+}
+
+async function deployCoreInfrastructure() {
+  const feePayer = loadOrCreateWallet("feePayer");
+  web3.eth.accounts.wallet.add(
+    web3.eth.accounts.privateKeyToAccount(feePayer.privateKey),
+  );
+
+  const { implementationInitCode, factoryInitCode } = predictCoreAddresses();
+
+  // Deploy Implementation if not deployed
+  const implementationCode = await web3.eth.getCode(walletsData.implementation.address);
+  if (implementationCode === "0x") {
+    await deployUniversal(IMPLEMENTATION_SALT, implementationInitCode, "Implementation");
+    console.log("Implementation deployed!");
+  }
+
+  // Deploy Factory if not deployed
+  const factoryCode = await web3.eth.getCode(walletsData.factory?.address);
+  if (factoryCode === "0x") {
+    await deployUniversal(FACTORY_SALT, factoryInitCode, "Factory");
+    console.log("Factory deployed!");
+  }
 }
 
 function predictUserWalletAddress() {
@@ -224,8 +255,8 @@ function predictUserWalletAddress() {
 
 // === MAIN SCRIPT ===
 async function main() {
-  // await deployUserWalletImplementation();
-  // await deployFactoryContract();
+  // predictCoreAddresses();
+  // await deployCoreInfrastructure();
   // predictUserWalletAddress();
   await deployOrExecute();
 }
@@ -271,14 +302,14 @@ async function executeOnly() {
   const { maxFeePerGas, maxPriorityFeePerGas } = await getMaxFeePerGasData();
 
   console.log("Sending transaction from fee payer, tx", tx);
-  const gasEstimate = await tx.estimateGas({ from: feePayer.address });
+  const gasEstimate = await tx.estimateGas();
 
   console.log("Gas estimate:", gasEstimate);
   const receipt = await tx.send({
     from: feePayer.address,
     gas: gasEstimate.toString(),
-    maxFeePerGas: maxFeePerGas.toString(),
-    maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
+    maxFeePerGas,
+    maxPriorityFeePerGas,
   });
 
   console.log(
@@ -333,7 +364,6 @@ async function deployAndExecute() {
     to,
     value,
     data,
-    hash,
     signature,
   );
 
@@ -343,8 +373,8 @@ async function deployAndExecute() {
   const receipt = await deployTx.send({
     from: feePayer.address,
     gas: gasEstimate.toString(),
-    maxFeePerGas: maxFeePerGas.toString(),
-    maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
+    maxFeePerGas,
+    maxPriorityFeePerGas,
   });
 
   console.log(
@@ -373,3 +403,12 @@ async function deployOrExecute() {
     deployAndExecute();
   }
 }
+
+/*
+TODOs:
+* Factory and User Implementation constant addresses in all networks
+* Nonce management
+* Security issues solving
+* Transaction expiration??
+* In our app, reduce fees of tokenization and sent transactions (created a task)
+*/

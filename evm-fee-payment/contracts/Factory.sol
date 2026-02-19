@@ -9,8 +9,7 @@ interface IUserWallet {
         address to,
         uint256 value,
         bytes calldata data,
-        bytes32 hash,
-        bytes calldata signature
+        bytes calldata signature // Hash removed here too
     ) external payable;
 }
 
@@ -29,7 +28,6 @@ contract Factory {
         address to,
         uint256 value,
         bytes calldata data,
-        bytes32 hash,
         bytes calldata signature
     ) external payable returns (address wallet) {
         wallet = implementation.cloneDeterministic(salt);
@@ -40,7 +38,6 @@ contract Factory {
             to,
             value,
             data,
-            hash,
             signature
         );
     }
