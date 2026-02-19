@@ -406,7 +406,6 @@ async function deployOrExecute() {
 
 /*
 TODOs:
-* Factory and User Implementation constant addresses in all networks
 * Nonce management
 * Security issues solving
 * Transaction expiration??
