@@ -5,10 +5,8 @@ contract UserWallet {
     address public owner;
     uint256 public nonce;
 
-    error InvalidSignature();
-    error CallFailed();
-
     function initialize(address _owner) external {
+        require(owner == address(0), "Already initialized");
         owner = _owner;
     }
 
@@ -16,46 +14,33 @@ contract UserWallet {
         address to,
         uint256 value,
         bytes calldata data,
+        uint256 providedNonce,
         bytes calldata signature
     ) external payable {
+        require(providedNonce == nonce, "UserWallet: Invalid nonce");
+
         bytes32 hash = keccak256(
             abi.encodePacked(address(this), to, value, data, nonce)
         );
 
         address signer = _recover(hash, signature);
-        if (signer != owner) revert InvalidSignature();
+        require(signer == owner, "UserWallet: Invalid signature");
 
         unchecked { ++nonce; }
 
         (bool ok, ) = to.call{value: value}(data);
-        if (!ok) revert CallFailed();
+        require(ok, "UserWallet: Call execution failed");
     }
 
-    function _recover(bytes32 hash, bytes calldata sig)
-        internal
-        pure
-        returns (address signer)
-    {
-        if (sig.length != 65) revert InvalidSignature();
-
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
+    function _recover(bytes32 hash, bytes calldata sig) internal pure returns (address signer) {
+        if (sig.length != 65) return address(0);
+        bytes32 r; bytes32 s; uint8 v;
         assembly {
             r := calldataload(sig.offset)
             s := calldataload(add(sig.offset, 32))
             v := byte(0, calldataload(add(sig.offset, 64)))
         }
-
-        signer = ecrecover(
-            keccak256(
-                abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)
-            ),
-            v,
-            r,
-            s
-        );
+        return ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)), v, r, s);
     }
 
     receive() external payable {}

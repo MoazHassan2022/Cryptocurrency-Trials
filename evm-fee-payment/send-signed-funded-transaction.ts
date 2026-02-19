@@ -12,8 +12,8 @@ const CONTRACTS_PATH = join(process.cwd(), "contracts");
 const web3 = new Web3(RPC_URL);
 
 // Fixed salts for multi-chain deterministic addresses
-const IMPLEMENTATION_SALT = web3.utils.keccak256("USER_WALLET_IMPLEMENTATION_CONTRACT_V1");
-const FACTORY_SALT = web3.utils.keccak256("FACTORY_CONTRACT_V1");
+const IMPLEMENTATION_SALT = web3.utils.keccak256("USER_WALLET_IMPLEMENTATION_CONTRACT_V3");
+const FACTORY_SALT = web3.utils.keccak256("FACTORY_CONTRACT_V3");
 const UNIVERSAL_CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 
 let walletsData: {
@@ -276,8 +276,9 @@ async function executeOnly() {
 
   const walletContract = new web3.eth.Contract(abi, user.contractAddress);
 
-  const nonce = await walletContract.methods.nonce().call();
+  // const nonce = await walletContract.methods.nonce().call();
 
+  const nonce  = 1;
   console.log("Nonce:", nonce);
 
   const to = "0xb5517Db9568E6b9f3015441B6E48ea3B22E20a68";
@@ -297,7 +298,7 @@ async function executeOnly() {
   console.log("Signature:", signature);
 
   // 5️⃣ Send transaction from fee payer
-  const tx = walletContract.methods.execute(to, value, data, hash, signature);
+  const tx = walletContract.methods.execute(to, value, data, nonce, signature);
 
   const { maxFeePerGas, maxPriorityFeePerGas } = await getMaxFeePerGasData();
 
@@ -364,6 +365,7 @@ async function deployAndExecute() {
     to,
     value,
     data,
+    nonce,
     signature,
   );
 
